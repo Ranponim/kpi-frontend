@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Input } from '@/components/ui/input.jsx'

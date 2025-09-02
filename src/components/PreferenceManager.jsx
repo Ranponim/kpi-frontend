@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
@@ -11,7 +11,7 @@ import DerivedPegManager from './DerivedPegManager.jsx'
 import { usePreference, useDashboardSettings } from '@/hooks/usePreference.js'
 import apiClient from '@/lib/apiClient.js'
 import { formatPegOptionsForUI } from '@/lib/derivedPegUtils.js'
-import { CardDescription } from '@/components/ui/card.jsx'
+
 
 const PreferenceManager = () => {
   const { settings, isLoading, isSaving, error, lastSaved, updateSettings, saveSettings, resetSettings } = usePreference()

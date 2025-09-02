@@ -65,7 +65,7 @@ const getBaseURL = () => {
     // DOCKER RUN 시 -e BACKEND_BASE_URL="http://host:port" 또는 -e VITE_API_BASE_URL 로 주입하면 런타임에 즉시 반영됩니다.
     const runtimeCfg = typeof window !== 'undefined' ? (window.__RUNTIME_CONFIG__ || {}) : {}
     const runtimeBase = runtimeCfg.BACKEND_BASE_URL || runtimeCfg.VITE_API_BASE_URL
-    const baseURL = (runtimeBase && String(runtimeBase).trim()) || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const baseURL = (runtimeBase && String(runtimeBase).trim()) || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
     
     logApiClient('info', 'API 기본 URL 설정', { baseURL, runtimeCfg: Object.keys(runtimeCfg) })
     return baseURL
