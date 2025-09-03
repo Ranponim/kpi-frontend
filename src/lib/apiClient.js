@@ -61,17 +61,65 @@ const logApiClient = (level, message, data = null) => {
  */
 const getBaseURL = () => {
   try {
-    // 런타임 구성(window.__RUNTIME_CONFIG__) → Vite env → 기본값 순으로 사용
-    // DOCKER RUN 시 -e BACKEND_BASE_URL="http://host:port" 또는 -e VITE_API_BASE_URL 로 주입하면 런타임에 즉시 반영됩니다.
+    // 1. 런타임 구성 우선 확인 (Docker 환경에서 사용)
     const runtimeCfg = typeof window !== 'undefined' ? (window.__RUNTIME_CONFIG__ || {}) : {}
-    const runtimeBase = runtimeCfg.BACKEND_BASE_URL || runtimeCfg.VITE_API_BASE_URL
-    const baseURL = (runtimeBase && String(runtimeBase).trim()) || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
-    
-    logApiClient('info', 'API 기본 URL 설정', { baseURL, runtimeCfg: Object.keys(runtimeCfg) })
+    let baseURL = null
+
+    // 2. 런타임 설정에서 URL 확인
+    if (runtimeCfg.BACKEND_BASE_URL && String(runtimeCfg.BACKEND_BASE_URL).trim()) {
+      baseURL = String(runtimeCfg.BACKEND_BASE_URL).trim()
+      logApiClient('info', '런타임 설정에서 BACKEND_BASE_URL 사용', baseURL)
+    } else if (runtimeCfg.VITE_API_BASE_URL && String(runtimeCfg.VITE_API_BASE_URL).trim()) {
+      baseURL = String(runtimeCfg.VITE_API_BASE_URL).trim()
+      logApiClient('info', '런타임 설정에서 VITE_API_BASE_URL 사용', baseURL)
+    }
+
+    // 3. Vite 환경변수 확인 (빌드 시점 설정)
+    if (!baseURL && import.meta.env.VITE_API_BASE_URL) {
+      baseURL = import.meta.env.VITE_API_BASE_URL
+      logApiClient('info', 'Vite 환경변수에서 URL 사용', baseURL)
+    }
+
+    // 4. 환경별 기본값 설정 (강제 localhost 방지)
+    if (!baseURL) {
+      // 현재 호스트 확인
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+      const currentPort = typeof window !== 'undefined' ? window.location.port : '3000'
+
+      // Docker 환경 감지 (호스트가 localhost가 아닌 경우)
+      if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+        // Docker/productions 환경: 설정된 백엔드 URL 사용
+        baseURL = 'http://165.213.69.30:8000/api'
+        logApiClient('info', 'Docker 환경 감지, 설정된 백엔드 URL 사용', baseURL)
+      } else {
+        // 개발 환경: localhost 사용
+        baseURL = 'http://localhost:8000/api'
+        logApiClient('info', '개발 환경 감지, localhost 사용', baseURL)
+      }
+    }
+
+    // 5. 최종 검증 및 포맷팅
+    if (baseURL && !baseURL.endsWith('/api')) {
+      baseURL = baseURL.endsWith('/') ? `${baseURL}api` : `${baseURL}/api`
+    }
+
+    logApiClient('info', '최종 API URL 결정', {
+      baseURL,
+      runtimeCfg: Object.keys(runtimeCfg),
+      currentHost: typeof window !== 'undefined' ? window.location.hostname : 'unknown',
+      isDockerEnv: typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    })
+
     return baseURL
   } catch (error) {
     logApiClient('error', 'API 기본 URL 설정 오류', error)
-    return 'http://localhost:8000'
+
+    // 에러 시에도 환경에 맞는 기본값 반환
+    const isDockerEnv = typeof window !== 'undefined' &&
+                       window.location.hostname !== 'localhost' &&
+                       window.location.hostname !== '127.0.0.1'
+
+    return isDockerEnv ? 'http://165.213.69.30:8000/api' : 'http://localhost:8000/api'
   }
 }
 

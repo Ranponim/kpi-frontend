@@ -198,34 +198,153 @@ npm run analyze:bundle
 
 ## 🐳 Docker 배포
 
+### 🔧 환경변수 설정
+
+Docker 컨테이너에서 백엔드 API URL을 설정하려면 다음 환경변수를 사용하세요:
+
+```bash
+# 백엔드 API URL 설정
+-e BACKEND_BASE_URL="http://165.213.69.30:8000"
+-e VITE_API_BASE_URL="http://165.213.69.30:8000/api"
+
+# 데이터베이스 설정 (선택사항)
+-e DB_HOST="165.213.69.30"
+-e DB_PORT="5432"
+-e DB_USER="kpi_user"
+-e DB_NAME="kpi_db"
+-e DB_PASSWORD="your_password"
+```
+
 ### Docker 이미지 빌드
 
 ```bash
-# 멀티스테이지 빌드
+# 기본 빌드
 docker build -t kpi-dashboard:latest .
 
-# 또는 특정 환경을 위한 빌드
-docker build --build-arg NODE_ENV=production -t kpi-dashboard:prod .
+# 빌드 시점에 API URL 설정 (권장)
+docker build \
+  --build-arg VITE_API_BASE_URL="http://165.213.69.30:8000/api" \
+  -t kpi-dashboard:latest .
 ```
 
 ### 컨테이너 실행
 
 ```bash
-# 개발 환경
-docker run -p 5173:80 kpi-dashboard:latest
+# 1. 기본 실행 (기본값 사용: http://165.213.69.30:8000)
+docker run -p 8080:80 --name kpi-frontend kpi-dashboard:latest
 
-# 프로덕션 환경
-docker run -p 80:80 -e NODE_ENV=production kpi-dashboard:prod
+# 2. 환경변수로 API URL 설정 (권장)
+docker run -p 8080:80 \
+  -e BACKEND_BASE_URL="http://165.213.69.30:8000" \
+  -e VITE_API_BASE_URL="http://165.213.69.30:8000/api" \
+  --name kpi-frontend kpi-dashboard:latest
+
+# 3. 개발 환경용 (localhost)
+docker run -p 8080:80 \
+  -e BACKEND_BASE_URL="http://localhost:8000" \
+  -e VITE_API_BASE_URL="http://localhost:8000/api" \
+  --name kpi-frontend-dev kpi-dashboard:latest
+
+# 4. 다른 서버용
+docker run -p 8080:80 \
+  -e BACKEND_BASE_URL="http://your-server.com:8000" \
+  -e VITE_API_BASE_URL="http://your-server.com:8000/api" \
+  --name kpi-frontend-custom kpi-dashboard:latest
 ```
 
-### Docker Compose
+### Docker Compose (권장)
+
+프로젝트 루트에 `docker-compose.yml` 파일을 생성하고 사용하세요:
 
 ```yaml
 version: '3.8'
 services:
-  kpi-dashboard:
-    build: .
+  frontend:
+    image: kpi-dashboard-frontend:latest
+    build:
+      context: .
+      args:
+        VITE_API_BASE_URL: http://165.213.69.30:8000/api
     ports:
+      - "8080:80"
+    environment:
+      - BACKEND_BASE_URL=http://165.213.69.30:8000
+      - VITE_API_BASE_URL=http://165.213.69.30:8000/api
+      - DB_HOST=165.213.69.30
+      - DB_PORT=5432
+      - DB_USER=kpi_user
+      - DB_NAME=kpi_db
+    restart: unless-stopped
+```
+
+실행 명령어:
+```bash
+# 빌드 및 실행
+docker-compose up --build -d
+
+# 로그 확인
+docker-compose logs -f frontend
+
+# 중지
+docker-compose down
+```
+
+### 환경변수 설정 파일
+
+`.env` 파일을 만들어 환경변수를 관리할 수 있습니다:
+
+```bash
+# .env 파일 예제
+BACKEND_BASE_URL=http://165.213.69.30:8000
+VITE_API_BASE_URL=http://165.213.69.30:8000/api
+DB_HOST=165.213.69.30
+DB_PORT=5432
+DB_USER=kpi_user
+DB_NAME=kpi_db
+```
+
+### 확인 방법
+
+컨테이너가 정상적으로 실행되면:
+
+1. **컨테이너 로그 확인**:
+```bash
+docker logs kpi-frontend
+# 또는
+docker-compose logs frontend
+```
+
+2. **브라우저에서 확인**:
+   - `http://localhost:8080` 접속
+   - 브라우저 콘솔에서 `console.log(window.__RUNTIME_CONFIG__)` 실행
+   - API 요청이 올바른 URL로 가는지 Network 탭에서 확인
+
+3. **컨테이너 내부 확인**:
+```bash
+docker exec -it kpi-frontend /bin/sh
+cat /usr/share/nginx/html/runtime-config.js
+```
+
+### 문제 해결
+
+환경변수가 적용되지 않는 경우:
+
+1. **컨테이너 재시작**:
+```bash
+docker restart kpi-frontend
+```
+
+2. **캐시 삭제 후 재빌드**:
+```bash
+docker system prune -f
+docker-compose down
+docker-compose up --build --force-recreate
+```
+
+3. **환경변수 확인**:
+```bash
+docker exec kpi-frontend env | grep -E "(BACKEND|VITE_API|DB_)"
+```
       - "80:80"
     environment:
       - NODE_ENV=production
@@ -363,4 +482,6 @@ git commit -m "test: E2E 테스트 케이스 추가"
 **개발자**: AI Assistant & Team
 **마지막 업데이트**: 2024-01-XX
 **문서 버전**: 1.0.0
+
+
 

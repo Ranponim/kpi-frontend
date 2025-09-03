@@ -17,6 +17,12 @@ export default defineConfig({
       brotliSize: true,
     })
   ].filter(Boolean),
+
+  // 환경변수 설정
+  define: {
+    // Docker 환경에서 사용할 기본 API URL
+    __DOCKER_API_BASE_URL__: JSON.stringify(process.env.VITE_API_BASE_URL || 'http://165.213.69.30:8000/api'),
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

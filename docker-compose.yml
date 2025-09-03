@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: kpi-dashboard-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://165.213.69.30:8000/api
+    ports:
+      - "8080:80"
+    environment:
+      # 백엔드 API URL 설정
+      - BACKEND_BASE_URL=http://165.213.69.30:8000
+      - VITE_API_BASE_URL=http://165.213.69.30:8000/api
+
+      # 데이터베이스 설정 (선택사항)
+      - DB_HOST=165.213.69.30
+      - DB_PORT=5432
+      - DB_USER=kpi_user
+      - DB_NAME=kpi_db
+      - DB_PASSWORD=
+
+    restart: unless-stopped
+
+    # 헬스체크
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # 리소스 제한
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
