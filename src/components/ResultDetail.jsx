@@ -1581,14 +1581,14 @@ const ResultDetail = ({
     const recommendedActions = extractRecommendedActions(analysis)
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 max-w-full overflow-hidden">
         {/* 종합 분석 요약 */}
-        <Card>
+        <Card className="max-w-full overflow-hidden">
           <CardHeader>
             <CardTitle>종합 분석 요약</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+          <CardContent className="max-w-full overflow-hidden">
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words max-w-full">
               {summaryText}
             </div>
           </CardContent>
@@ -1596,11 +1596,11 @@ const ResultDetail = ({
 
         {/* 핵심 관찰 사항 (diagnostic_findings) */}
         {diagnosticFindings.length > 0 && (
-          <Card>
+          <Card className="max-w-full overflow-hidden">
             <CardHeader>
               <CardTitle>핵심 관찰 사항</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-w-full overflow-hidden">
               <div className="space-y-3">
                 {diagnosticFindings.map((d, idx) => (
                   <div key={idx} className="space-y-1">
@@ -1622,24 +1622,24 @@ const ResultDetail = ({
 
         {/* 권장 조치 (recommended_actions) */}
         {recommendedActions.length > 0 && (
-          <Card>
+          <Card className="max-w-full overflow-hidden">
             <CardHeader>
               <CardTitle>권장 조치</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+            <CardContent className="max-w-full overflow-hidden">
+              <div className="space-y-3 max-w-full overflow-hidden">
                 {recommendedActions.map((a, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <div className="mt-0.5">
+                  <div key={idx} className="flex items-start gap-3 max-w-full overflow-hidden">
+                    <div className="mt-0.5 flex-shrink-0">
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        {a.priority && <Badge variant="outline">{a.priority}</Badge>}
-                        <div className="text-sm font-medium break-words whitespace-pre-wrap">{a.action || '-'}</div>
+                    <div className="flex-1 min-w-0 max-w-full overflow-hidden">
+                      <div className="flex items-center gap-2 max-w-full overflow-hidden">
+                        {a.priority && <Badge variant="outline" className="flex-shrink-0">{a.priority}</Badge>}
+                        <div className="text-sm font-medium break-words whitespace-pre-wrap min-w-0 max-w-full">{a.action || '-'}</div>
                       </div>
                       {a.details && (
-                        <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words">{a.details}</div>
+                        <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words max-w-full">{a.details}</div>
                       )}
                     </div>
                   </div>
@@ -1696,8 +1696,8 @@ const ResultDetail = ({
 
   // === 단일 결과 개요 ===
   const renderSingleOverview = (result) => (
-    <div className="space-y-4">
-      <Card className="border-l-4 border-l-blue-500">
+    <div className="space-y-4 max-w-full overflow-hidden">
+      <Card className="border-l-4 border-l-blue-500 max-w-full overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
@@ -1708,7 +1708,7 @@ const ResultDetail = ({
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 max-w-full overflow-hidden">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
               <div className="text-sm font-medium text-muted-foreground">분석 날짜</div>
@@ -1729,20 +1729,20 @@ const ResultDetail = ({
           </div>
 
           {result.analysisResult && (
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-full overflow-hidden">
               <div className="text-sm font-medium text-muted-foreground">분석 결과</div>
-              <div className="text-sm bg-muted p-3 rounded-md max-h-32 overflow-y-auto break-words whitespace-pre-wrap">
+              <div className="text-sm bg-muted p-3 rounded-md max-h-32 overflow-y-auto break-words whitespace-pre-wrap max-w-full">
                 {result.analysisResult}
               </div>
             </div>
           )}
 
           {result.recommendations && result.recommendations.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-full overflow-hidden">
               <div className="text-sm font-medium text-muted-foreground">권장 사항</div>
-              <div className="space-y-1">
+              <div className="space-y-1 max-w-full overflow-hidden">
                 {result.recommendations.map((rec, index) => (
-                  <div key={index} className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500 break-words whitespace-pre-wrap">
+                  <div key={index} className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500 break-words whitespace-pre-wrap max-w-full">
                     {rec}
                   </div>
                 ))}
@@ -2680,10 +2680,10 @@ const ResultDetail = ({
     <>
       {/* 메인 모달 */}
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className={`transition-all duration-500 ease-in-out transform ${
+        <DialogContent className={`transition-all duration-500 ease-in-out transform overflow-hidden ${
           isFullscreen
             ? 'max-w-[99vw] h-[98vh] w-[99vw] scale-100'
-            : 'max-w-7xl max-h-[85vh] w-[95vw] scale-100'
+            : 'max-w-6xl max-h-[85vh] w-[90vw] scale-100'
         }`}>
           <DialogHeader>
             <div className="flex items-center justify-between">
@@ -2713,10 +2713,10 @@ const ResultDetail = ({
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className={`transition-all duration-300 ${
+          <ScrollArea className={`transition-all duration-300 overflow-hidden ${
             isFullscreen ? 'h-[85vh]' : 'max-h-[70vh]'
           }`}>
-            <div className="px-1">
+            <div className="px-1 max-w-full overflow-hidden">
               {renderContent()}
             </div>
           </ScrollArea>
