@@ -128,6 +128,10 @@ const ResultDetail = ({
     setLoading(true)
     setError(null)
 
+    // 이전 요청 취소를 위한 AbortController
+    const abortController = new AbortController()
+    const signal = abortController.signal
+
     try {
       console.log('📊 분석 결과 상세 정보 요청:', ids)
 
@@ -142,9 +146,18 @@ const ResultDetail = ({
       for (const chunk of chunks) {
         const promises = chunk.map(async (id) => {
           try {
-            const response = await apiClient.get(`/api/analysis/results/${id}`)
+            // 요청이 취소되었는지 확인
+            if (signal.aborted) {
+              throw new Error('요청이 취소되었습니다')
+            }
+            const response = await apiClient.get(`/api/analysis/results/${id}`, { signal })
             return { ...response.data, id }
           } catch (err) {
+            // 취소된 요청은 에러로 처리하지 않음
+            if (signal.aborted) {
+              console.log(`⏹️ 결과 ${id} 요청 취소됨`)
+              return null
+            }
             console.error(`❌ 결과 ${id} 로딩 실패:`, err)
             return {
               id,
@@ -158,7 +171,9 @@ const ResultDetail = ({
         })
 
         const chunkResults = await Promise.all(promises)
-        allResults = [...allResults, ...chunkResults]
+        // null 값 제거 (취소된 요청)
+        const validResults = chunkResults.filter(result => result !== null)
+        allResults = [...allResults, ...validResults]
 
         // 메모리 효율을 위해 중간 결과 정리 (브라우저 환경에서 안전하게 처리)
         if (typeof window !== 'undefined' && window.gc) {
@@ -166,15 +181,44 @@ const ResultDetail = ({
         }
       }
 
-      setResults(allResults)
-      console.log('✅ 분석 결과 상세 정보 로딩 완료:', allResults.length, '개 항목')
+      // 요청이 취소되지 않았을 때만 결과 설정
+      if (!signal.aborted) {
+        setResults(allResults)
+        console.log('✅ 분석 결과 상세 정보 로딩 완료:', allResults.length, '개 항목')
+      } else {
+        console.log('⏹️ 요청이 취소되어 결과 설정을 건너뜀')
+      }
+      
+      // 첫 번째 결과의 데이터 구조 로깅
+      if (allResults.length > 0) {
+        const firstResult = allResults[0]
+        console.log('📋 첫 번째 결과 상세 구조:', {
+          id: firstResult.id,
+          hasKpiResults: !!firstResult.kpiResults,
+          hasStats: !!firstResult.stats,
+          kpiResultsType: typeof firstResult.kpiResults,
+          statsType: typeof firstResult.stats,
+          statsIsArray: Array.isArray(firstResult.stats),
+          allKeys: Object.keys(firstResult),
+          kpiResultsKeys: firstResult.kpiResults ? Object.keys(firstResult.kpiResults) : 'N/A',
+          statsLength: firstResult.stats?.length || 'N/A'
+        })
+      }
 
     } catch (err) {
+      // 취소된 요청은 에러로 처리하지 않음
+      if (signal.aborted) {
+        console.log('⏹️ 요청이 취소되어 에러 처리 건너뜀')
+        return
+      }
       console.error('❌ 분석 결과 상세 정보 로딩 실패:', err)
       setError(err.message || '데이터 로딩에 실패했습니다')
       toast.error('분석 결과를 불러오는데 실패했습니다')
     } finally {
-      setLoading(false)
+      // 취소된 요청이 아닐 때만 로딩 상태 해제
+      if (!signal.aborted) {
+        setLoading(false)
+      }
     }
   }
 
@@ -499,24 +543,82 @@ const ResultDetail = ({
     }
   }, [])
 
-  // === Effect: 모달 열릴 때 데이터 로딩 ===
+  // === 상태 초기화 함수 ===
+  const resetAllStates = useCallback(() => {
+    console.log('🔄 모든 상태 초기화 시작')
+    setResults([])
+    setLoading(false)
+    setError(null)
+    setChoiAlgorithmResult('absent')
+    setMahalanobisResult(null)
+    setPegComparisonResult(null)
+    setPegPage(0)
+    setPegPageSize(10)
+    setPegFilter('')
+    setWeightFilter('all')
+    setTrendFilter('all')
+    setIsFullscreen(false)
+    setHelpModal({ isOpen: false, algorithm: null })
+    console.log('✅ 모든 상태 초기화 완료')
+  }, [])
+
+  // === Effect: resultIds 변경 시 상태 초기화 및 데이터 로딩 ===
   useEffect(() => {
     if (isOpen && resultIds.length > 0) {
+      console.log('📊 새로운 결과 ID로 전환:', resultIds)
+      // 먼저 모든 상태를 초기화
+      resetAllStates()
+      // 그 다음에 새로운 데이터 로딩
       fetchResultDetails(resultIds)
     }
-  }, [isOpen, resultIds])
+  }, [isOpen, resultIds, resetAllStates])
+
+  // === Effect: 모달이 닫힐 때 상태 정리 ===
+  useEffect(() => {
+    if (!isOpen) {
+      console.log('🚪 모달이 닫혀서 모든 상태 정리')
+      resetAllStates()
+    }
+  }, [isOpen, resetAllStates])
 
   // === Effect: 데이터 로딩 완료 후 알고리즘 실행 ===
   useEffect(() => {
+    console.log('🔍 마할라노비스 분석 디버깅:', {
+      resultsLength: results.length,
+      loading,
+      processedResults: results.filter(r => !r.error).length
+    })
+
     const currentProcessedResults = results.filter(r => !r.error)
     if (currentProcessedResults.length > 0 && !loading) {
       const firstResult = currentProcessedResults[0]
+      console.log('📊 첫 번째 결과 데이터 구조:', {
+        hasKpiResults: !!firstResult?.kpiResults,
+        hasStats: !!firstResult?.stats,
+        kpiResultsKeys: firstResult?.kpiResults ? Object.keys(firstResult.kpiResults) : [],
+        statsLength: firstResult?.stats?.length || 0,
+        fullResult: firstResult
+      })
 
       // 마할라노비스 거리 계산
       if (firstResult?.kpiResults || firstResult?.stats) {
         const mahalanobisData = firstResult.kpiResults || firstResult.stats
-        const mahalanobisResult = calculateMahalanobisDistance(mahalanobisData)
-        setMahalanobisResult(mahalanobisResult)
+        console.log('🧮 마할라노비스 계산용 데이터:', mahalanobisData)
+        
+        try {
+          const mahalanobisResult = calculateMahalanobisDistance(mahalanobisData)
+          console.log('✅ 마할라노비스 계산 결과:', mahalanobisResult)
+          setMahalanobisResult(mahalanobisResult)
+        } catch (error) {
+          console.error('❌ 마할라노비스 계산 오류:', error)
+          setMahalanobisResult({ error: '계산 중 오류 발생: ' + error.message })
+        }
+      } else {
+        console.warn('⚠️ 마할라노비스 계산을 위한 데이터가 없습니다:', {
+          kpiResults: firstResult?.kpiResults,
+          stats: firstResult?.stats
+        })
+        setMahalanobisResult({ error: '분석 데이터가 없습니다' })
       }
 
       // PEG 비교 결과 계산
@@ -524,6 +626,11 @@ const ResultDetail = ({
         const pegResult = calculatePegComparison(firstResult)
         setPegComparisonResult(pegResult)
       }
+    } else {
+      console.log('⏳ 마할라노비스 분석 대기 중:', {
+        hasResults: currentProcessedResults.length > 0,
+        isLoading: loading
+      })
     }
   }, [results, loading, calculateMahalanobisDistance, calculatePegComparison])
 
@@ -1166,6 +1273,12 @@ const ResultDetail = ({
 
   // === 마할라노비스 거리 알고리즘 결과 렌더링 ===
   const renderMahalanobisResult = () => {
+    console.log('🎨 마할라노비스 렌더링 상태:', {
+      mahalanobisResult,
+      loading,
+      resultsLength: results.length
+    })
+
     if (!mahalanobisResult) {
       return (
         <Card className="border-l-4 border-l-orange-500">
@@ -1177,7 +1290,19 @@ const ResultDetail = ({
           </CardHeader>
           <CardContent>
             <div className="text-center py-4">
-              <p className="text-muted-foreground">분석 데이터를 불러오는 중...</p>
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <p className="text-muted-foreground">분석 데이터를 불러오는 중...</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-muted-foreground">분석 데이터를 기다리는 중...</p>
+                  <p className="text-xs text-muted-foreground">
+                    결과: {results.length}개, 로딩: {loading ? '예' : '아니오'}
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
