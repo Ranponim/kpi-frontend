@@ -142,11 +142,47 @@ const ResultDetail = ({
     try {
       console.log('📊 분석 결과 상세 정보 요청:', ids)
 
-      // 메모리 효율을 위해 청크 단위로 처리
-      const chunks = []
-      for (let i = 0; i < ids.length; i += dataChunkSize) {
-        chunks.push(ids.slice(i, i + dataChunkSize))
+      // ID 유효성 검증 및 정리
+      const validIds = ids.filter(id => {
+        if (!id || typeof id !== 'string' && typeof id !== 'number') {
+          console.warn(`⚠️ 잘못된 ID 형식 감지:`, id, typeof id)
+          return false
+        }
+        
+        const idStr = String(id).trim()
+        if (!idStr || idStr === 'undefined' || idStr === 'null') {
+          console.warn(`⚠️ 빈 ID 감지:`, id)
+          return false
+        }
+        
+        // ID 형식 검증 (숫자, UUID, 또는 특정 패턴)
+        const isValidFormat = /^[a-zA-Z0-9_-]+$/.test(idStr) && idStr.length > 0 && idStr.length <= 100
+        if (!isValidFormat) {
+          console.warn(`⚠️ 잘못된 ID 형식:`, idStr)
+          return false
+        }
+        
+        return true
+      }).map(id => String(id).trim())
+      
+      if (validIds.length === 0) {
+        throw new Error('유효한 결과 ID가 없습니다.')
       }
+      
+      if (validIds.length !== ids.length) {
+        console.warn(`⚠️ ${ids.length - validIds.length}개의 잘못된 ID가 제거되었습니다.`)
+      }
+      
+      console.log(`📊 유효한 ID 목록:`, validIds)
+
+      // 메모리 효율을 위해 청크 단위로 처리 (서버 부하 고려하여 청크 크기 조정)
+      const chunks = []
+      const adjustedChunkSize = Math.min(dataChunkSize, 3) // 서버 부하 방지를 위해 최대 3개씩 처리
+      for (let i = 0; i < validIds.length; i += adjustedChunkSize) {
+        chunks.push(validIds.slice(i, i + adjustedChunkSize))
+      }
+      
+      console.log(`📊 청크 처리 정보: 총 ${validIds.length}개 항목을 ${chunks.length}개 청크로 분할 (청크당 최대 ${adjustedChunkSize}개)`)
 
       let allResults = []
 
@@ -157,22 +193,140 @@ const ResultDetail = ({
             if (signal.aborted) {
               throw new Error('요청이 취소되었습니다')
             }
-            const response = await apiClient.get(`/api/analysis/results/${id}`, { signal })
-            return { ...response.data, id }
+            
+            // 500 에러에 대한 재시도 로직 추가
+            let retryCount = 0
+            const maxRetries = 2
+            let lastError = null
+            
+            while (retryCount <= maxRetries) {
+              try {
+                // URL 인코딩으로 안전한 요청 보장
+                const encodedId = encodeURIComponent(id)
+                const requestUrl = `/api/analysis/results/${encodedId}`
+                
+                console.log(`🌐 API 요청: ${requestUrl} (원본 ID: ${id})`)
+                
+                const response = await apiClient.get(requestUrl, { 
+                  signal,
+                  timeout: 10000, // 10초 타임아웃
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                  }
+                })
+                
+                // 응답 데이터 검증
+                if (!response.data) {
+                  throw new Error('서버에서 빈 응답을 반환했습니다.')
+                }
+                
+                console.log(`✅ 결과 ${id} 로딩 성공 (시도 ${retryCount + 1}/${maxRetries + 1})`)
+                return { ...response.data, id }
+              } catch (err) {
+                lastError = err
+                
+                // 요청 취소된 경우
+                if (signal.aborted) {
+                  throw new Error('요청이 취소되었습니다')
+                }
+                
+                // 네트워크 에러인 경우
+                if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+                  console.warn(`🌐 네트워크 에러 - 결과 ${id}:`, err.message)
+                  if (retryCount < maxRetries) {
+                    retryCount++
+                    const delay = 2000 // 네트워크 에러는 2초 대기
+                    console.warn(`⚠️ 네트워크 에러로 인한 재시도, ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`)
+                    await new Promise(resolve => setTimeout(resolve, delay))
+                    continue
+                  }
+                }
+                
+                // 500 에러이고 재시도 가능한 경우
+                if (err?.response?.status === 500 && retryCount < maxRetries) {
+                  retryCount++
+                  const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000) // 지수 백오프, 최대 5초
+                  console.warn(`⚠️ 결과 ${id} 500 에러 발생, ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`)
+                  await new Promise(resolve => setTimeout(resolve, delay))
+                  continue
+                }
+                
+                // 404 에러인 경우 (존재하지 않는 ID)
+                if (err?.response?.status === 404) {
+                  console.warn(`⚠️ 결과 ${id}를 찾을 수 없습니다 (404)`)
+                  throw new Error(`분석 결과를 찾을 수 없습니다 (ID: ${id})`)
+                }
+                
+                // 재시도 불가능하거나 다른 에러인 경우
+                throw err
+              }
+            }
+            
+            throw lastError
           } catch (err) {
             // 취소된 요청은 에러로 처리하지 않음
             if (signal.aborted) {
               console.log(`⏹️ 결과 ${id} 요청 취소됨`)
               return null
             }
-            console.error(`❌ 결과 ${id} 로딩 실패:`, err)
+            
+            // 에러 타입별 상세 로깅 및 분류
+            const errorInfo = {
+              id,
+              status: err?.response?.status,
+              message: err.message,
+              url: err?.config?.url,
+              method: err?.config?.method,
+              retryAttempts: maxRetries + 1,
+              timestamp: new Date().toISOString()
+            }
+            
+            if (err?.response?.status === 500) {
+              console.error(`❌ 결과 ${id} 서버 내부 오류 (500) - 재시도 실패:`, errorInfo)
+            } else if (err?.response?.status === 404) {
+              console.warn(`⚠️ 결과 ${id}를 찾을 수 없음 (404):`, errorInfo)
+            } else if (err?.response?.status === 400) {
+              console.warn(`⚠️ 결과 ${id} 잘못된 요청 (400):`, errorInfo)
+            } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+              console.error(`🌐 결과 ${id} 네트워크 오류:`, errorInfo)
+            } else {
+              console.error(`❌ 결과 ${id} 로딩 실패:`, errorInfo)
+            }
+            
+            // 사용자 친화적인 에러 메시지 생성
+            let userMessage = '로딩 실패'
+            let errorType = 'unknown_error'
+            
+            if (err?.response?.status === 500) {
+              userMessage = '서버 내부 오류 (잠시 후 다시 시도해주세요)'
+              errorType = 'server_error'
+            } else if (err?.response?.status === 404) {
+              userMessage = '분석 결과를 찾을 수 없습니다'
+              errorType = 'not_found'
+            } else if (err?.response?.status === 400) {
+              userMessage = '잘못된 요청입니다'
+              errorType = 'bad_request'
+            } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+              userMessage = '네트워크 연결 오류'
+              errorType = 'network_error'
+            } else if (err.message?.includes('timeout')) {
+              userMessage = '요청 시간 초과'
+              errorType = 'timeout_error'
+            } else {
+              userMessage = err.message || '알 수 없는 오류가 발생했습니다'
+              errorType = 'client_error'
+            }
+            
             return {
               id,
-              error: err.message || '로딩 실패',
+              error: userMessage,
               analysisDate: new Date().toISOString(),
               neId: '-',
               cellId: '-',
-              status: 'error'
+              status: 'error',
+              errorType,
+              errorDetails: errorInfo
             }
           }
         })
@@ -186,12 +340,50 @@ const ResultDetail = ({
         if (typeof window !== 'undefined' && window.gc) {
           window.gc()
         }
+        
+        // 서버 부하 분산을 위해 청크 간 지연 추가 (마지막 청크 제외)
+        if (chunks.indexOf(chunk) < chunks.length - 1) {
+          const delay = 200 // 200ms 지연
+          console.log(`⏳ 서버 부하 분산을 위해 ${delay}ms 대기 중...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
       }
 
       // 요청이 취소되지 않았을 때만 결과 설정
       if (!signal.aborted) {
         setResults(allResults)
-        console.log('✅ 분석 결과 상세 정보 로딩 완료:', allResults.length, '개 항목')
+        
+        // 에러 통계 계산 및 로깅
+        const errorStats = allResults.reduce((stats, result) => {
+          if (result.error) {
+            stats.totalErrors++
+            if (result.errorType === 'server_error') {
+              stats.serverErrors++
+            } else {
+              stats.clientErrors++
+            }
+          } else {
+            stats.successCount++
+          }
+          return stats
+        }, { totalErrors: 0, serverErrors: 0, clientErrors: 0, successCount: 0 })
+        
+        console.log('✅ 분석 결과 상세 정보 로딩 완료:', {
+          totalItems: allResults.length,
+          successCount: errorStats.successCount,
+          errorCount: errorStats.totalErrors,
+          serverErrors: errorStats.serverErrors,
+          clientErrors: errorStats.clientErrors,
+          successRate: `${((errorStats.successCount / allResults.length) * 100).toFixed(1)}%`
+        })
+        
+        // 서버 에러가 많이 발생한 경우 사용자에게 알림
+        if (errorStats.serverErrors > 0) {
+          const errorRate = (errorStats.serverErrors / allResults.length) * 100
+          if (errorRate > 30) { // 30% 이상 서버 에러 발생 시
+            toast.warning(`일부 데이터 로딩에 실패했습니다 (서버 에러: ${errorStats.serverErrors}개). 잠시 후 다시 시도해주세요.`)
+          }
+        }
       } else {
         console.log('⏹️ 요청이 취소되어 결과 설정을 건너뜀')
       }
