@@ -272,17 +272,60 @@ export const triggerLLMAnalysis = async (dbConfig, analysisParams, userId = 'def
  */
 export const getLLMAnalysisResult = async (analysisId) => {
   logApiClient('info', 'LLM 분석 결과 조회', { analysisId })
-  
+
   try {
     const response = await apiClient.get(`/api/analysis/llm-analysis/${analysisId}`)
-    
-    logApiClient('info', 'LLM 분석 결과 조회 성공', { 
+
+    // ResponseValidationError 감지 및 로깅
+    if (response.data?.detail && Array.isArray(response.data.detail)) {
+      const validationErrors = response.data.detail
+      const hasMissingDataError = validationErrors.some(d => d.type === 'missing' && d.loc?.includes('data'))
+
+      if (hasMissingDataError) {
+        logApiClient('error', '🚨 ResponseValidationError 감지 (LLM 분석): data 필드 누락', {
+          analysisId,
+          validationErrors,
+          responseDataKeys: response.data ? Object.keys(response.data) : []
+        })
+      }
+    }
+
+    // 응답 데이터 구조 로깅
+    logApiClient('info', 'LLM 분석 결과 조회 성공', {
       analysisId,
-      hasData: !!response.data 
+      hasData: !!response.data,
+      dataType: typeof response.data,
+      dataKeys: response.data && typeof response.data === 'object' ? Object.keys(response.data) : [],
+      hasNestedData: !!response.data?.data,
+      nestedDataKeys: response.data?.data ? Object.keys(response.data.data) : [],
+      hasAnalysis: !!response.data?.analysis || !!response.data?.data?.analysis,
+      analysisKeys: response.data?.analysis ? Object.keys(response.data.analysis) :
+                   response.data?.data?.analysis ? Object.keys(response.data.data.analysis) : []
     })
+
     return response.data
   } catch (error) {
-    logApiClient('error', 'LLM 분석 결과 조회 실패', { analysisId, error })
+    // ResponseValidationError 구분 로깅
+    if (error?.response?.data?.detail && Array.isArray(error.response.data.detail)) {
+      const validationErrors = error.response.data.detail
+      const hasMissingDataError = validationErrors.some(d => d.type === 'missing' && d.loc?.includes('data'))
+
+      if (hasMissingDataError) {
+        logApiClient('error', '🚨 ResponseValidationError 발생 (LLM 분석): data 필드 누락', {
+          analysisId,
+          status: error.response.status,
+          validationErrors,
+          fullError: error.response.data
+        })
+      }
+    }
+
+    logApiClient('error', 'LLM 분석 결과 조회 실패', {
+      analysisId,
+      error: error.message,
+      status: error?.response?.status,
+      hasValidationError: !!(error?.response?.data?.detail && Array.isArray(error.response.data.detail))
+    })
     throw error
   }
 }

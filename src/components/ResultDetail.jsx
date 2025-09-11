@@ -1247,12 +1247,42 @@ const ResultDetail = ({
   // === LLM 분석 리포트 렌더링 (analysis_llm.py HTML 구성과 동일 섹션) ===
   const renderLLMReport = (results) => {
     const first = results?.[0] || {}
-    // 백엔드 응답 구조 정규화: { success, message, data: { ...문서... } }
+    
+    // 백엔드 응답 구조 로깅
+    console.log('🔍 LLM 분석 결과 디버깅:', {
+      results,
+      first,
+      firstKeys: Object.keys(first),
+      hasData: !!first?.data,
+      dataKeys: first?.data ? Object.keys(first.data) : [],
+      hasNestedData: !!first?.data?.data,
+      nestedDataKeys: first?.data?.data ? Object.keys(first.data.data) : [],
+      hasAnalysis: !!first?.analysis || !!first?.data?.analysis || !!first?.data?.data?.analysis
+    })
+    
     const doc = first?.data?.data || first?.data || first
     const analysis = doc?.analysis || {}
+    
+    // 분석 객체 로깅
+    console.log('📊 분석 객체 구조:', {
+      analysis,
+      analysisKeys: Object.keys(analysis),
+      availableSummaries: {
+        executive_summary: !!analysis.executive_summary,
+        overall_summary: !!analysis.overall_summary,
+        comprehensive_summary: !!analysis.comprehensive_summary
+      }
+    })
 
-    // 요약: executive_summary 우선, 그 외 호환 키 폴백
     const summaryText = analysis.executive_summary || analysis.overall_summary || analysis.comprehensive_summary || '요약 정보가 없습니다.'
+    
+    // 요약 텍스트 로깅
+    console.log('📝 최종 요약 텍스트:', {
+      summaryText,
+      selectedField: analysis.executive_summary ? 'executive_summary' :
+                     analysis.overall_summary ? 'overall_summary' :
+                     analysis.comprehensive_summary ? 'comprehensive_summary' : 'none'
+    })
 
     // 진단 결과: diagnostic_findings(list[dict]) 우선, 없으면 key_findings(list[str]) 폴백
     const diagnosticFindings = Array.isArray(analysis.diagnostic_findings) && analysis.diagnostic_findings.length
