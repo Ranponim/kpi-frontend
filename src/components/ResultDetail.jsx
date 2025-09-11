@@ -1278,28 +1278,49 @@ const ResultDetail = ({
   const extractAnalysisData = (data) => {
     let doc, analysis, dataStructure
 
-    // 우선순위 1: 개선된 구조 (first.data.analysis) - 권장
-    if (data?.data?.analysis) {
+    // 우선순위 1: Backend 표준 구조 (data.analysis) - LLM 결과가 analysis 필드에 저장됨
+    if (data?.data?.analysis && typeof data.data.analysis === 'object' && !Array.isArray(data.data.analysis)) {
       doc = data.data
       analysis = doc.analysis
-      dataStructure = 'data.analysis (권장 구조)'
-      console.log('✅ 우선순위 1: data.analysis 구조 사용')
+      dataStructure = 'data.analysis (Backend 표준 구조 - LLM 결과 위치)'
+      console.log('✅ 우선순위 1: data.analysis 구조 사용 (Backend 표준 - LLM 결과 위치)')
     }
-    // 우선순위 2: 기존 중첩 구조 (first.data.data.analysis) - 호환성 유지
+    // 우선순위 2: Backend 표준 구조 (data) - data 필드가 직접 LLM 결과인 경우
+    else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+      // data 필드에 LLM 분석 결과가 직접 있는지 확인
+      const hasLLMFields = data.data.executive_summary !== undefined || 
+                          data.data.overall_summary !== undefined || 
+                          data.data.comprehensive_summary !== undefined ||
+                          data.data.diagnostic_findings !== undefined
+      
+      if (hasLLMFields) {
+        doc = data
+        analysis = doc.data
+        dataStructure = 'data (Backend 표준 구조 - LLM 결과 직접 위치)'
+        console.log('✅ 우선순위 2: data 구조 사용 (Backend 표준 - LLM 결과 직접 위치)')
+      } else {
+        // LLM 필드가 없으면 다음 우선순위로
+        doc = data
+        analysis = {}
+        dataStructure = 'data (LLM 필드 없음)'
+        console.log('⚠️ data 구조에 LLM 필드가 없습니다')
+      }
+    }
+    // 우선순위 3: 기존 중첩 구조 (first.data.data.analysis) - 호환성 유지
     else if (data?.data?.data?.analysis) {
       doc = data.data.data
       analysis = doc.analysis
-      dataStructure = 'data.data.analysis (기존 구조)'
-      console.log('⚠️ 우선순위 2: data.data.analysis 구조 사용 (중첩 구조)')
+      dataStructure = 'data.data.analysis (기존 중첩 구조)'
+      console.log('⚠️ 우선순위 3: data.data.analysis 구조 사용 (중첩 구조)')
     }
-    // 우선순위 3: 직접 구조 (first.analysis) - 폴백
+    // 우선순위 4: 직접 구조 (first.analysis) - 폴백
     else if (data?.analysis) {
       doc = data
       analysis = doc.analysis
       dataStructure = 'analysis (직접 구조)'
-      console.log('📋 우선순위 3: analysis 직접 구조 사용')
+      console.log('📋 우선순위 4: analysis 직접 구조 사용')
     }
-    // 우선순위 4: 기본값
+    // 우선순위 5: 기본값
     else {
       doc = data || {}
       analysis = {}
@@ -1360,7 +1381,7 @@ const ResultDetail = ({
     return validation
   }
 
-  // 개선된 요약 텍스트 추출 (우선순위 기반)
+  // 개선된 요약 텍스트 추출 (우선순위 기반 + 유연한 필드 탐색)
   const extractSummaryText = (analysis) => {
     let summaryText = '요약 정보가 없습니다.'
     let selectedField = 'none'
@@ -1369,39 +1390,77 @@ const ResultDetail = ({
       return { summaryText, selectedField }
     }
 
-    // 우선순위 1: executive_summary (권장 필드)
-    if (analysis.executive_summary && typeof analysis.executive_summary === 'string') {
-      summaryText = analysis.executive_summary.trim()
-      selectedField = 'executive_summary'
-      console.log('✅ executive_summary 사용 (권장 필드)')
-    }
-    // 우선순위 2: overall_summary (대안 필드)
-    else if (analysis.overall_summary && typeof analysis.overall_summary === 'string') {
-      summaryText = analysis.overall_summary.trim()
-      selectedField = 'overall_summary'
-      console.log('📝 overall_summary 사용 (대안 필드)')
-    }
-    // 우선순위 3: comprehensive_summary (최종 폴백)
-    else if (analysis.comprehensive_summary && typeof analysis.comprehensive_summary === 'string') {
-      summaryText = analysis.comprehensive_summary.trim()
-      selectedField = 'comprehensive_summary'
-      console.log('📝 comprehensive_summary 사용 (최종 폴백)')
-    }
-    // 우선순위 4: 다른 가능한 필드들 탐색
-    else {
-      const possibleFields = ['summary', 'conclusion', 'result', 'description']
-      for (const field of possibleFields) {
-        if (analysis[field] && typeof analysis[field] === 'string') {
-          summaryText = analysis[field].trim()
+    // 우선순위 1: 표준 LLM 분석 요약 필드들
+    const priorityFields = [
+      'executive_summary',     // 경영진 요약
+      'overall_summary',       // 전체 요약
+      'comprehensive_summary', // 종합 요약
+      'summary',              // 일반 요약
+      'conclusion',           // 결론
+      'result',               // 결과
+      'description',          // 설명
+      'analysis_summary',     // 분석 요약
+      'key_findings',         // 주요 발견사항 (문자열인 경우)
+      'recommendations',      // 권장사항 (문자열인 경우)
+      'insights',             // 통찰
+      'overview'              // 개요
+    ]
+
+    // 우선순위 필드들을 순차적으로 탐색
+    for (const field of priorityFields) {
+      const value = analysis[field]
+
+      if (value) {
+        // 문자열인 경우 직접 사용
+        if (typeof value === 'string' && value.trim()) {
+          summaryText = value.trim()
           selectedField = field
-          console.log(`📝 ${field} 필드 발견 및 사용`)
+          console.log(`✅ ${field} 필드 사용 (문자열)`)
           break
         }
+        // 배열인 경우 첫 번째 요소가 문자열이면 사용
+        else if (Array.isArray(value) && value.length > 0) {
+          const firstItem = value[0]
+          if (typeof firstItem === 'string' && firstItem.trim()) {
+            summaryText = firstItem.trim()
+            selectedField = `${field}[0]`
+            console.log(`📝 ${field} 배열의 첫 번째 요소 사용`)
+            break
+          }
+          // 객체 배열인 경우 특정 필드 탐색
+          else if (typeof firstItem === 'object' && firstItem) {
+            const textFields = ['text', 'content', 'summary', 'description', 'message']
+            for (const textField of textFields) {
+              if (firstItem[textField] && typeof firstItem[textField] === 'string') {
+                summaryText = firstItem[textField].trim()
+                selectedField = `${field}[0].${textField}`
+                console.log(`📝 ${field}[0].${textField} 필드 사용`)
+                break
+              }
+            }
+            if (selectedField !== 'none') break
+          }
+        }
+        // 객체인 경우 특정 필드 탐색
+        else if (typeof value === 'object') {
+          const textFields = ['text', 'content', 'summary', 'description', 'message']
+          for (const textField of textFields) {
+            if (value[textField] && typeof value[textField] === 'string') {
+              summaryText = value[textField].trim()
+              selectedField = `${field}.${textField}`
+              console.log(`📝 ${field}.${textField} 필드 사용`)
+              break
+            }
+          }
+          if (selectedField !== 'none') break
+        }
       }
+    }
 
-      if (selectedField === 'none') {
-        console.warn('⚠️ 모든 요약 필드가 비어있거나 유효하지 않습니다')
-      }
+    // 모든 필드 탐색에도 실패한 경우
+    if (selectedField === 'none') {
+      console.warn('⚠️ 모든 요약 필드가 비어있거나 유효하지 않습니다')
+      console.log('🔍 사용 가능한 필드들:', Object.keys(analysis))
     }
 
     return { summaryText, selectedField }
@@ -1430,6 +1489,30 @@ const ResultDetail = ({
         executive_summary: !!analysis?.executive_summary,
         overall_summary: !!analysis?.overall_summary,
         comprehensive_summary: !!analysis?.comprehensive_summary
+      },
+      // 추가 디버깅: 원본 데이터 구조 확인
+      originalDataKeys: Object.keys(first || {}),
+      hasDataField: 'data' in (first || {}),
+      dataFieldKeys: first?.data ? Object.keys(first.data) : [],
+      hasAnalysisInData: first?.data?.analysis !== undefined,
+      analysisInDataKeys: first?.data?.analysis ? Object.keys(first.data.analysis) : [],
+      // LLM 필드 존재 여부 상세 확인
+      llmFieldsCheck: {
+        executive_summary: {
+          exists: analysis?.executive_summary !== undefined,
+          type: typeof analysis?.executive_summary,
+          value: analysis?.executive_summary
+        },
+        overall_summary: {
+          exists: analysis?.overall_summary !== undefined,
+          type: typeof analysis?.overall_summary,
+          value: analysis?.overall_summary
+        },
+        comprehensive_summary: {
+          exists: analysis?.comprehensive_summary !== undefined,
+          type: typeof analysis?.comprehensive_summary,
+          value: analysis?.comprehensive_summary
+        }
       }
     })
 
@@ -1443,17 +1526,59 @@ const ResultDetail = ({
       isValid: !!summaryText && summaryText !== '요약 정보가 없습니다.'
     })
 
-    // 진단 결과: diagnostic_findings(list[dict]) 우선, 없으면 key_findings(list[str]) 폴백
-    const diagnosticFindings = Array.isArray(analysis.diagnostic_findings) && analysis.diagnostic_findings.length
-      ? analysis.diagnostic_findings
-      : (Array.isArray(analysis.key_findings) ? analysis.key_findings.map(t => ({ primary_hypothesis: String(t) })) : [])
+    // 진단 결과: 다중 필드 지원으로 유연한 탐색
+    const extractDiagnosticFindings = (analysis) => {
+      // 우선순위: diagnostic_findings -> key_findings -> findings -> observations
+      const possibleFields = ['diagnostic_findings', 'key_findings', 'findings', 'observations', 'insights']
 
-    // 권장 조치: recommended_actions(list[dict] 또는 list[str]) 처리
-    const recommendedActionsRaw = Array.isArray(analysis.recommended_actions) ? analysis.recommended_actions : []
-    const recommendedActions = recommendedActionsRaw.map((a) => {
-      if (a && typeof a === 'object') return a
-      return { priority: '', action: String(a || ''), details: '' }
-    })
+      for (const field of possibleFields) {
+        const value = analysis[field]
+        if (Array.isArray(value) && value.length > 0) {
+          // 이미 객체 배열인 경우
+          if (typeof value[0] === 'object' && value[0]) {
+            return value
+          }
+          // 문자열 배열인 경우 객체로 변환
+          else if (typeof value[0] === 'string') {
+            return value.map(item => ({ primary_hypothesis: String(item) }))
+          }
+        }
+      }
+      return []
+    }
+
+    const diagnosticFindings = extractDiagnosticFindings(analysis)
+
+    // 권장 조치: 다중 필드 지원으로 유연한 탐색
+    const extractRecommendedActions = (analysis) => {
+      // 우선순위: recommended_actions -> recommendations -> actions -> suggestions
+      const possibleFields = ['recommended_actions', 'recommendations', 'actions', 'suggestions']
+
+      for (const field of possibleFields) {
+        const value = analysis[field]
+        if (Array.isArray(value) && value.length > 0) {
+          return value.map((a) => {
+            if (a && typeof a === 'object') return a
+            return { priority: '', action: String(a || ''), details: '' }
+          })
+        }
+        // 단일 객체인 경우 배열로 변환
+        else if (value && typeof value === 'object') {
+          return [{
+            priority: value.priority || '',
+            action: value.action || String(value),
+            details: value.details || ''
+          }]
+        }
+        // 문자열인 경우 객체로 변환
+        else if (typeof value === 'string' && value.trim()) {
+          return [{ priority: '', action: value.trim(), details: '' }]
+        }
+      }
+      return []
+    }
+
+    const recommendedActions = extractRecommendedActions(analysis)
 
     return (
       <div className="space-y-4">
