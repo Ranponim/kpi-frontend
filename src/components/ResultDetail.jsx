@@ -6,7 +6,7 @@
  * Task 52: LLM 분석 결과 상세 보기 및 비교 기능 UI 구현
  */
 
-import React, { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -128,8 +128,15 @@ const ResultDetail = ({
     setLoading(true)
     setError(null)
 
-    // 이전 요청 취소를 위한 AbortController
+    // 이전 요청이 있으면 취소
+    if (abortControllerRef.current) {
+      console.log('⏹️ 이전 요청 취소')
+      abortControllerRef.current.abort()
+    }
+
+    // 새로운 AbortController 생성 및 저장
     const abortController = new AbortController()
+    abortControllerRef.current = abortController
     const signal = abortController.signal
 
     try {
@@ -543,9 +550,20 @@ const ResultDetail = ({
     }
   }, [])
 
+  // === AbortController 관리 ===
+  const abortControllerRef = useRef(null)
+
   // === 상태 초기화 함수 ===
   const resetAllStates = useCallback(() => {
     console.log('🔄 모든 상태 초기화 시작')
+    
+    // 이전 요청이 있으면 취소
+    if (abortControllerRef.current) {
+      console.log('⏹️ 이전 요청 취소')
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    
     setResults([])
     setLoading(false)
     setError(null)
@@ -570,6 +588,15 @@ const ResultDetail = ({
       resetAllStates()
       // 그 다음에 새로운 데이터 로딩
       fetchResultDetails(resultIds)
+    }
+
+    // cleanup 함수: 컴포넌트 언마운트 또는 의존성 변경 시 이전 요청 취소
+    return () => {
+      if (abortControllerRef.current) {
+        console.log('🧹 useEffect cleanup: 이전 요청 취소')
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
     }
   }, [isOpen, resultIds, resetAllStates])
 
