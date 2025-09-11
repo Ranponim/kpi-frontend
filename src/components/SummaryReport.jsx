@@ -149,7 +149,7 @@ const SummaryReport = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
+                <div className="prose max-w-none break-words whitespace-pre-wrap">
                   {formatContent(selectedReport.content)}
                 </div>
               </CardContent>

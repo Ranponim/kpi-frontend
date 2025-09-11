@@ -1588,7 +1588,7 @@ const ResultDetail = ({
             <CardTitle>종합 분석 요약</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-sm text-muted-foreground whitespace-pre-line">
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
               {summaryText}
             </div>
           </CardContent>
@@ -1605,13 +1605,13 @@ const ResultDetail = ({
                 {diagnosticFindings.map((d, idx) => (
                   <div key={idx} className="space-y-1">
                     {d.primary_hypothesis && (
-                      <div className="text-sm"><span className="font-semibold">가설 {idx + 1}:</span> {d.primary_hypothesis}</div>
+                      <div className="text-sm break-words whitespace-pre-wrap"><span className="font-semibold">가설 {idx + 1}:</span> {d.primary_hypothesis}</div>
                     )}
                     {d.supporting_evidence && (
-                      <div className="text-xs text-muted-foreground">증거: {d.supporting_evidence}</div>
+                      <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap">증거: {d.supporting_evidence}</div>
                     )}
                     {d.confounding_factors_assessment && (
-                      <div className="text-xs text-muted-foreground">교란 변수 평가: {d.confounding_factors_assessment}</div>
+                      <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap">교란 변수 평가: {d.confounding_factors_assessment}</div>
                     )}
                   </div>
                 ))}
@@ -1636,10 +1636,10 @@ const ResultDetail = ({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         {a.priority && <Badge variant="outline">{a.priority}</Badge>}
-                        <div className="text-sm font-medium">{a.action || '-'}</div>
+                        <div className="text-sm font-medium break-words whitespace-pre-wrap">{a.action || '-'}</div>
                       </div>
                       {a.details && (
-                        <div className="text-xs text-muted-foreground mt-1 whitespace-pre-line">{a.details}</div>
+                        <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words">{a.details}</div>
                       )}
                     </div>
                   </div>
@@ -1731,7 +1731,7 @@ const ResultDetail = ({
           {result.analysisResult && (
             <div className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">분석 결과</div>
-              <div className="text-sm bg-muted p-3 rounded-md max-h-32 overflow-y-auto">
+              <div className="text-sm bg-muted p-3 rounded-md max-h-32 overflow-y-auto break-words whitespace-pre-wrap">
                 {result.analysisResult}
               </div>
             </div>
@@ -1742,7 +1742,7 @@ const ResultDetail = ({
               <div className="text-sm font-medium text-muted-foreground">권장 사항</div>
               <div className="space-y-1">
                 {result.recommendations.map((rec, index) => (
-                  <div key={index} className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500">
+                  <div key={index} className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500 break-words whitespace-pre-wrap">
                     {rec}
                   </div>
                 ))}
@@ -2683,7 +2683,7 @@ const ResultDetail = ({
         <DialogContent className={`transition-all duration-500 ease-in-out transform ${
           isFullscreen
             ? 'max-w-[99vw] h-[98vh] w-[99vw] scale-100'
-            : 'max-w-6xl max-h-[85vh] w-[90vw] scale-100'
+            : 'max-w-7xl max-h-[85vh] w-[95vw] scale-100'
         }`}>
           <DialogHeader>
             <div className="flex items-center justify-between">
