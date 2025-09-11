@@ -1244,44 +1244,203 @@ const ResultDetail = ({
     )
   }
 
-  // === LLM 분석 리포트 렌더링 (analysis_llm.py HTML 구성과 동일 섹션) ===
-  const renderLLMReport = (results) => {
-    const first = results?.[0] || {}
-    
-    // 백엔드 응답 구조 로깅
-    console.log('🔍 LLM 분석 결과 디버깅:', {
-      results,
-      first,
-      firstKeys: Object.keys(first),
-      hasData: !!first?.data,
-      dataKeys: first?.data ? Object.keys(first.data) : [],
-      hasNestedData: !!first?.data?.data,
-      nestedDataKeys: first?.data?.data ? Object.keys(first.data.data) : [],
-      hasAnalysis: !!first?.analysis || !!first?.data?.analysis || !!first?.data?.data?.analysis
-    })
-    
-    const doc = first?.data?.data || first?.data || first
-    const analysis = doc?.analysis || {}
-    
-    // 분석 객체 로깅
-    console.log('📊 분석 객체 구조:', {
-      analysis,
-      analysisKeys: Object.keys(analysis),
-      availableSummaries: {
-        executive_summary: !!analysis.executive_summary,
-        overall_summary: !!analysis.overall_summary,
-        comprehensive_summary: !!analysis.comprehensive_summary
+  // === LLM 데이터 구조 분석 헬퍼 함수들 ===
+
+  // 데이터 구조 자동 분석
+  const analyzeLLMDataStructure = (data) => {
+    const analysis = {
+      hasDirectAnalysis: !!data?.analysis,
+      hasDataAnalysis: !!data?.data?.analysis,
+      hasNestedDataAnalysis: !!data?.data?.data?.analysis,
+      dataKeys: data ? Object.keys(data) : [],
+      nestedDataKeys: data?.data ? Object.keys(data.data) : [],
+      doubleNestedKeys: data?.data?.data ? Object.keys(data.data.data) : [],
+      structureType: 'unknown',
+      recommendedPath: ''
+    }
+
+    // 구조 타입 판정 및 추천 경로 설정
+    if (data?.data?.data?.analysis) {
+      analysis.structureType = 'triple_nested'
+      analysis.recommendedPath = 'data.data.analysis'
+    } else if (data?.data?.analysis) {
+      analysis.structureType = 'double_nested'
+      analysis.recommendedPath = 'data.analysis'
+    } else if (data?.analysis) {
+      analysis.structureType = 'single_level'
+      analysis.recommendedPath = 'analysis'
+    }
+
+    return analysis
+  }
+
+  // 우선순위 기반 분석 데이터 추출 (개선된 다중 폴백)
+  const extractAnalysisData = (data) => {
+    let doc, analysis, dataStructure
+
+    // 우선순위 1: 개선된 구조 (first.data.analysis) - 권장
+    if (data?.data?.analysis) {
+      doc = data.data
+      analysis = doc.analysis
+      dataStructure = 'data.analysis (권장 구조)'
+      console.log('✅ 우선순위 1: data.analysis 구조 사용')
+    }
+    // 우선순위 2: 기존 중첩 구조 (first.data.data.analysis) - 호환성 유지
+    else if (data?.data?.data?.analysis) {
+      doc = data.data.data
+      analysis = doc.analysis
+      dataStructure = 'data.data.analysis (기존 구조)'
+      console.log('⚠️ 우선순위 2: data.data.analysis 구조 사용 (중첩 구조)')
+    }
+    // 우선순위 3: 직접 구조 (first.analysis) - 폴백
+    else if (data?.analysis) {
+      doc = data
+      analysis = doc.analysis
+      dataStructure = 'analysis (직접 구조)'
+      console.log('📋 우선순위 3: analysis 직접 구조 사용')
+    }
+    // 우선순위 4: 기본값
+    else {
+      doc = data || {}
+      analysis = {}
+      dataStructure = 'empty (데이터 없음)'
+      console.warn('❌ 모든 우선순위 실패: 분석 데이터를 찾을 수 없습니다')
+    }
+
+    return { doc, analysis, dataStructure }
+  }
+
+  // 데이터 검증 함수 (타입 안전성 강화)
+  const validateAnalysisData = (analysis) => {
+    const validation = {
+      isValid: false,
+      errors: [],
+      warnings: []
+    }
+
+    if (!analysis) {
+      validation.errors.push('analysis 객체가 없습니다')
+      return validation
+    }
+
+    if (typeof analysis !== 'object') {
+      validation.errors.push('analysis가 객체 타입이 아닙니다')
+      return validation
+    }
+
+    // executive_summary 검증
+    if (analysis.executive_summary !== undefined) {
+      if (typeof analysis.executive_summary === 'string') {
+        validation.isValid = true
+      } else {
+        validation.warnings.push('executive_summary가 문자열 타입이 아닙니다')
+      }
+    }
+
+    // 다른 요약 필드들도 검증
+    const summaryFields = ['overall_summary', 'comprehensive_summary']
+    summaryFields.forEach(field => {
+      if (analysis[field] !== undefined && typeof analysis[field] !== 'string') {
+        validation.warnings.push(`${field}가 문자열 타입이 아닙니다`)
       }
     })
 
-    const summaryText = analysis.executive_summary || analysis.overall_summary || analysis.comprehensive_summary || '요약 정보가 없습니다.'
-    
-    // 요약 텍스트 로깅
+    // 필수 필드 존재 확인
+    const requiredFields = ['diagnostic_findings', 'recommended_actions']
+    requiredFields.forEach(field => {
+      if (analysis[field] === undefined) {
+        validation.warnings.push(`선택적 필드 ${field}가 없습니다`)
+      }
+    })
+
+    if (validation.errors.length === 0) {
+      validation.isValid = true
+    }
+
+    return validation
+  }
+
+  // 개선된 요약 텍스트 추출 (우선순위 기반)
+  const extractSummaryText = (analysis) => {
+    let summaryText = '요약 정보가 없습니다.'
+    let selectedField = 'none'
+
+    if (!analysis) {
+      return { summaryText, selectedField }
+    }
+
+    // 우선순위 1: executive_summary (권장 필드)
+    if (analysis.executive_summary && typeof analysis.executive_summary === 'string') {
+      summaryText = analysis.executive_summary.trim()
+      selectedField = 'executive_summary'
+      console.log('✅ executive_summary 사용 (권장 필드)')
+    }
+    // 우선순위 2: overall_summary (대안 필드)
+    else if (analysis.overall_summary && typeof analysis.overall_summary === 'string') {
+      summaryText = analysis.overall_summary.trim()
+      selectedField = 'overall_summary'
+      console.log('📝 overall_summary 사용 (대안 필드)')
+    }
+    // 우선순위 3: comprehensive_summary (최종 폴백)
+    else if (analysis.comprehensive_summary && typeof analysis.comprehensive_summary === 'string') {
+      summaryText = analysis.comprehensive_summary.trim()
+      selectedField = 'comprehensive_summary'
+      console.log('📝 comprehensive_summary 사용 (최종 폴백)')
+    }
+    // 우선순위 4: 다른 가능한 필드들 탐색
+    else {
+      const possibleFields = ['summary', 'conclusion', 'result', 'description']
+      for (const field of possibleFields) {
+        if (analysis[field] && typeof analysis[field] === 'string') {
+          summaryText = analysis[field].trim()
+          selectedField = field
+          console.log(`📝 ${field} 필드 발견 및 사용`)
+          break
+        }
+      }
+
+      if (selectedField === 'none') {
+        console.warn('⚠️ 모든 요약 필드가 비어있거나 유효하지 않습니다')
+      }
+    }
+
+    return { summaryText, selectedField }
+  }
+
+  // === LLM 분석 리포트 렌더링 (개선된 데이터 구조 처리) ===
+  const renderLLMReport = (results) => {
+    const first = results?.[0] || {}
+
+    // 강화된 디버깅: 데이터 구조 자동 분석
+    const dataStructureAnalysis = analyzeLLMDataStructure(first)
+    console.log('🔍 LLM 분석 결과 디버깅:', dataStructureAnalysis)
+
+    // 개선된 분석 객체 추출: 우선순위 기반 다중 폴백
+    const { doc, analysis, dataStructure } = extractAnalysisData(first)
+
+    // 타입 안전성 강화: 데이터 검증
+    const validationResult = validateAnalysisData(analysis)
+
+    console.log('📊 분석 객체 구조:', {
+      analysis,
+      analysisKeys: Object.keys(analysis || {}),
+      dataStructure,
+      validationResult,
+      availableSummaries: {
+        executive_summary: !!analysis?.executive_summary,
+        overall_summary: !!analysis?.overall_summary,
+        comprehensive_summary: !!analysis?.comprehensive_summary
+      }
+    })
+
+    // 개선된 요약 텍스트 추출: 우선순위 기반
+    const { summaryText, selectedField } = extractSummaryText(analysis)
+
     console.log('📝 최종 요약 텍스트:', {
-      summaryText,
-      selectedField: analysis.executive_summary ? 'executive_summary' :
-                     analysis.overall_summary ? 'overall_summary' :
-                     analysis.comprehensive_summary ? 'comprehensive_summary' : 'none'
+      summaryText: summaryText?.substring(0, 200) + '...' || '없음',
+      selectedField,
+      textLength: summaryText?.length || 0,
+      isValid: !!summaryText && summaryText !== '요약 정보가 없습니다.'
     })
 
     // 진단 결과: diagnostic_findings(list[dict]) 우선, 없으면 key_findings(list[str]) 폴백

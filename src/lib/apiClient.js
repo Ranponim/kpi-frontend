@@ -266,6 +266,108 @@ export const triggerLLMAnalysis = async (dbConfig, analysisParams, userId = 'def
 }
 
 /**
+// === LLM 데이터 구조 분석 헬퍼 함수들 ===
+
+/**
+ * 데이터 구조 분석 함수
+ * @param {Object} data - 분석할 데이터 객체
+ * @returns {Object} 구조 분석 결과
+ */
+const analyzeDataStructure = (data) => {
+  if (!data || typeof data !== 'object') {
+    return {
+      hasData: false,
+      dataType: typeof data,
+      structureType: 'invalid',
+      recommendation: '데이터가 유효하지 않습니다'
+    }
+  }
+
+  const analysis = {
+    hasData: true,
+    dataType: typeof data,
+    dataKeys: Object.keys(data),
+    structureType: 'unknown',
+    hasNestedData: !!data.data,
+    hasAnalysis: !!data.analysis,
+    hasNestedAnalysis: !!data.data?.analysis,
+    hasDoubleNestedAnalysis: !!data.data?.data?.analysis,
+    recommendation: ''
+  }
+
+  // 구조 타입 판정
+  if (data.data?.data?.analysis) {
+    analysis.structureType = 'triple_nested'
+    analysis.recommendation = '백엔드 개선 필요: data.data.analysis → data.analysis'
+  } else if (data.data?.analysis) {
+    analysis.structureType = 'double_nested'
+    analysis.recommendation = '권장 구조: data.analysis'
+  } else if (data.analysis) {
+    analysis.structureType = 'single_level'
+    analysis.recommendation = '단순 구조: analysis'
+  } else {
+    analysis.structureType = 'no_analysis'
+    analysis.recommendation = '분석 데이터가 없습니다'
+  }
+
+  return analysis
+}
+
+/**
+ * executive_summary 존재 여부 확인
+ * @param {Object} data - 확인할 데이터 객체
+ * @returns {boolean} executive_summary 존재 여부
+ */
+const checkExecutiveSummaryPresence = (data) => {
+  if (!data) return false
+
+  // 여러 경로에서 확인
+  const paths = [
+    data.analysis?.executive_summary,
+    data.data?.analysis?.executive_summary,
+    data.data?.data?.analysis?.executive_summary
+  ]
+
+  return paths.some(path => path && typeof path === 'string' && path.trim().length > 0)
+}
+
+/**
+ * 데이터 구조 건강도 평가
+ * @param {Object} data - 평가할 데이터 객체
+ * @returns {string} 건강도 상태
+ */
+const evaluateDataStructureHealth = (data) => {
+  if (!data) return 'critical'
+
+  let score = 0
+  const maxScore = 5
+
+  // 1. 기본 데이터 존재
+  if (data && typeof data === 'object') score++
+
+  // 2. 분석 데이터 존재
+  if (data.analysis || data.data?.analysis || data.data?.data?.analysis) score++
+
+  // 3. executive_summary 존재
+  if (checkExecutiveSummaryPresence(data)) score++
+
+  // 4. 중첩 구조가 아닌 경우
+  if (data.data?.analysis && !data.data?.data?.analysis) score++
+
+  // 5. 데이터 타입 검증
+  const analysis = data.analysis || data.data?.analysis || data.data?.data?.analysis || {}
+  if (analysis && typeof analysis === 'object') score++
+
+  // 건강도 판정
+  const healthRatio = score / maxScore
+  if (healthRatio >= 0.8) return 'excellent'
+  if (healthRatio >= 0.6) return 'good'
+  if (healthRatio >= 0.4) return 'fair'
+  if (healthRatio >= 0.2) return 'poor'
+  return 'critical'
+}
+
+/**
  * 특정 LLM 분석 결과를 조회합니다
  * @param {string} analysisId - 분석 ID
  * @returns {Promise<Object>} 분석 결과
@@ -290,17 +392,14 @@ export const getLLMAnalysisResult = async (analysisId) => {
       }
     }
 
-    // 응답 데이터 구조 로깅
+    // 응답 데이터 구조 상세 로깅 (개선된 구조 분석)
+    const dataStructure = analyzeDataStructure(response.data)
     logApiClient('info', 'LLM 분석 결과 조회 성공', {
       analysisId,
-      hasData: !!response.data,
-      dataType: typeof response.data,
-      dataKeys: response.data && typeof response.data === 'object' ? Object.keys(response.data) : [],
-      hasNestedData: !!response.data?.data,
-      nestedDataKeys: response.data?.data ? Object.keys(response.data.data) : [],
-      hasAnalysis: !!response.data?.analysis || !!response.data?.data?.analysis,
-      analysisKeys: response.data?.analysis ? Object.keys(response.data.analysis) :
-                   response.data?.data?.analysis ? Object.keys(response.data.data.analysis) : []
+      ...dataStructure,
+      // 추가 검증 정보
+      hasExecutiveSummary: checkExecutiveSummaryPresence(response.data),
+      dataStructureHealth: evaluateDataStructureHealth(response.data)
     })
 
     return response.data
