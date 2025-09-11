@@ -1583,12 +1583,12 @@ const ResultDetail = ({
     return (
       <div className="space-y-4 max-w-full overflow-hidden">
         {/* 종합 분석 요약 */}
-        <Card className="max-w-full overflow-hidden">
+        <Card className="w-full overflow-hidden">
           <CardHeader>
             <CardTitle>종합 분석 요약</CardTitle>
           </CardHeader>
-          <CardContent className="max-w-full overflow-hidden">
-            <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words max-w-full">
+          <CardContent className="w-full overflow-hidden">
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap break-words w-full">
               {summaryText}
             </div>
           </CardContent>
@@ -1596,7 +1596,7 @@ const ResultDetail = ({
 
         {/* 핵심 관찰 사항 (diagnostic_findings) */}
         {diagnosticFindings.length > 0 && (
-          <Card className="max-w-full overflow-hidden">
+          <Card className="w-full overflow-hidden">
             <CardHeader>
               <CardTitle>핵심 관찰 사항</CardTitle>
             </CardHeader>
@@ -1622,7 +1622,7 @@ const ResultDetail = ({
 
         {/* 권장 조치 (recommended_actions) */}
         {recommendedActions.length > 0 && (
-          <Card className="max-w-full overflow-hidden">
+          <Card className="w-full overflow-hidden">
             <CardHeader>
               <CardTitle>권장 조치</CardTitle>
             </CardHeader>
@@ -1697,7 +1697,7 @@ const ResultDetail = ({
   // === 단일 결과 개요 ===
   const renderSingleOverview = (result) => (
     <div className="space-y-4 max-w-full overflow-hidden">
-      <Card className="border-l-4 border-l-blue-500 max-w-full overflow-hidden">
+      <Card className="border-l-4 border-l-blue-500 w-full overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">
@@ -1731,7 +1731,7 @@ const ResultDetail = ({
           {result.analysisResult && (
             <div className="space-y-2 max-w-full overflow-hidden">
               <div className="text-sm font-medium text-muted-foreground">분석 결과</div>
-              <div className="text-sm bg-muted p-3 rounded-md max-h-32 overflow-y-auto break-words whitespace-pre-wrap max-w-full">
+              <div className="text-sm bg-muted p-3 rounded-md max-h-48 overflow-y-auto break-words whitespace-pre-wrap w-full">
                 {result.analysisResult}
               </div>
             </div>
@@ -2683,7 +2683,7 @@ const ResultDetail = ({
         <DialogContent className={`transition-all duration-500 ease-in-out transform overflow-hidden ${
           isFullscreen
             ? 'max-w-[99vw] h-[98vh] w-[99vw] scale-100'
-            : 'max-w-6xl max-h-[85vh] w-[90vw] scale-100'
+            : 'max-w-6xl max-h-[90vh] w-auto min-w-[80vw] scale-100'
         }`}>
           <DialogHeader>
             <div className="flex items-center justify-between">
@@ -2714,9 +2714,9 @@ const ResultDetail = ({
           </DialogHeader>
 
           <ScrollArea className={`transition-all duration-300 overflow-hidden ${
-            isFullscreen ? 'h-[85vh]' : 'max-h-[70vh]'
+            isFullscreen ? 'h-[85vh]' : 'max-h-[75vh] min-h-[400px]'
           }`}>
-            <div className="px-1 max-w-full overflow-hidden">
+            <div className="px-1 w-full max-w-full overflow-hidden">
               {renderContent()}
             </div>
           </ScrollArea>
