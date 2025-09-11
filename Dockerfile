@@ -17,7 +17,23 @@ WORKDIR /app
 
 # 빌드 도구 설치
 RUN apk add --no-cache git
-도커커
+
+# 의존성 복사 및 설치
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# 환경변수로 API 엔드포인트 주입 가능 (VITE_*)
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+# 빌드 실행
+RUN if [ -f pnpm-lock.yaml ]; then \
+        npm i -g pnpm && pnpm run build; \
+    else \
+        npm run build; \
+    fi
+
+# === 개발용 런타임 ===
 FROM nginx:1.27-alpine AS runtime
 WORKDIR /usr/share/nginx/html
 RUN rm -rf ./*

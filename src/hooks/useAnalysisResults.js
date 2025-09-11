@@ -42,9 +42,9 @@ export const useAnalysisResults = ({
   
   // 필터 상태
   const [filters, setFilters] = useState({
-    // 운영 환경에서는 기본값으로 'ALL' 지정하여 누락 방지
-    neId: process.env.NODE_ENV === 'production' ? 'ALL' : '',
-    cellId: process.env.NODE_ENV === 'production' ? 'ALL' : '',
+    // 필터 기본값을 빈 문자열로 설정 (사용자가 명시적으로 선택하도록)
+    neId: '',
+    cellId: '',
     startDate: null,
     endDate: null,
     status: '',

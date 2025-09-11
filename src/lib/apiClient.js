@@ -61,45 +61,51 @@ const logApiClient = (level, message, data = null) => {
  */
 const getBaseURL = () => {
   try {
-    // 1. 런타임 구성 우선 확인 (Docker 환경에서 사용)
-    const runtimeCfg = typeof window !== 'undefined' ? (window.__RUNTIME_CONFIG__ || {}) : {}
+    // 환경변수 우선순위: Vite 환경변수 > 런타임 설정 > 기본값
     let baseURL = null
 
-    // 2. 런타임 설정에서 URL 확인
-    if (runtimeCfg.BACKEND_BASE_URL && String(runtimeCfg.BACKEND_BASE_URL).trim()) {
-      baseURL = String(runtimeCfg.BACKEND_BASE_URL).trim()
-      logApiClient('info', '런타임 설정에서 BACKEND_BASE_URL 사용', baseURL)
-    } else if (runtimeCfg.VITE_API_BASE_URL && String(runtimeCfg.VITE_API_BASE_URL).trim()) {
-      baseURL = String(runtimeCfg.VITE_API_BASE_URL).trim()
-      logApiClient('info', '런타임 설정에서 VITE_API_BASE_URL 사용', baseURL)
-    }
-
-    // 3. Vite 환경변수 확인 (빌드 시점 설정)
-    if (!baseURL && import.meta.env.VITE_API_BASE_URL) {
+    // 1. Vite 환경변수 우선 확인 (최고 우선순위)
+    if (import.meta.env.VITE_API_BASE_URL) {
       baseURL = import.meta.env.VITE_API_BASE_URL
-      logApiClient('info', 'Vite 환경변수에서 URL 사용', baseURL)
+      logApiClient('info', 'Vite 환경변수에서 URL 사용 (최고 우선순위)', baseURL)
     }
 
-    // 4. 환경별 기본값 설정 (강제 localhost 방지)
+    // 2. 런타임 설정 확인 (Docker 환경에서 사용)
     if (!baseURL) {
-      // 현재 호스트 확인
-      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
-      const currentPort = typeof window !== 'undefined' ? window.location.port : '3000'
+      const runtimeCfg = typeof window !== 'undefined' ? (window.__RUNTIME_CONFIG__ || {}) : {}
 
-      // Docker 환경 감지 (호스트가 localhost가 아닌 경우)
-      if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-        // Docker/productions 환경: 설정된 백엔드 URL 사용
-        baseURL = 'http://165.213.69.30:8000/api'
-        logApiClient('info', 'Docker 환경 감지, 설정된 백엔드 URL 사용', baseURL)
-      } else {
-        // 개발 환경: localhost 사용
-        baseURL = 'http://localhost:8000/api'
-        logApiClient('info', '개발 환경 감지, localhost 사용', baseURL)
+      if (runtimeCfg.VITE_API_BASE_URL && String(runtimeCfg.VITE_API_BASE_URL).trim()) {
+        baseURL = String(runtimeCfg.VITE_API_BASE_URL).trim()
+        logApiClient('info', '런타임 설정에서 VITE_API_BASE_URL 사용', baseURL)
+      } else if (runtimeCfg.BACKEND_BASE_URL && String(runtimeCfg.BACKEND_BASE_URL).trim()) {
+        baseURL = String(runtimeCfg.BACKEND_BASE_URL).trim()
+        logApiClient('info', '런타임 설정에서 BACKEND_BASE_URL 사용', baseURL)
       }
     }
 
-    // 5. 최종 검증 및 포맷팅
-    if (baseURL && !baseURL.endsWith('/api')) {
+    // 3. 환경별 기본값 설정 (항상 외부 백엔드 우선)
+    if (!baseURL) {
+      // 현재 호스트 확인
+      const currentHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+
+      // 외부 백엔드 서버 우선 사용 (개발 환경에서도 외부 API 사용)
+      if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+        // Docker/productions 환경: 설정된 백엔드 URL 사용
+        baseURL = 'http://165.213.69.30:8000'
+        logApiClient('info', '외부 호스트 감지, 외부 백엔드 URL 사용', baseURL)
+      } else {
+        // 개발 환경: 외부 백엔드 우선, localhost는 fallback
+        baseURL = 'http://165.213.69.30:8000'
+        logApiClient('info', '개발 환경에서도 외부 백엔드 우선 사용', baseURL)
+      }
+    }
+
+    // 5. 최종 검증 및 포맷팅 - 백엔드 URL에 /api가 이미 포함된 경우 그대로 사용
+    if (baseURL && baseURL.includes('/api')) {
+      // 이미 /api가 포함되어 있으면 그대로 사용
+      logApiClient('info', 'baseURL에 /api가 이미 포함되어 있음', baseURL)
+    } else if (baseURL && !baseURL.endsWith('/api')) {
+      // /api가 없으면 추가
       baseURL = baseURL.endsWith('/') ? `${baseURL}api` : `${baseURL}/api`
     }
 
@@ -119,7 +125,7 @@ const getBaseURL = () => {
                        window.location.hostname !== 'localhost' &&
                        window.location.hostname !== '127.0.0.1'
 
-    return isDockerEnv ? 'http://165.213.69.30:8000/api' : 'http://localhost:8000/api'
+    return isDockerEnv ? 'http://165.213.69.30:8000' : 'http://165.213.69.30:8000'
   }
 }
 
