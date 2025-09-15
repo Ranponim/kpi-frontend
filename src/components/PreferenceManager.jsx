@@ -44,8 +44,7 @@ const PreferenceManager = () => {
         user: String(dbConfig.user || '').trim(),
         password: String(dbConfig.password || '').trim(),
         dbname: String(dbConfig.dbname || '').trim(),
-        table: String(dbConfig.table || 'summary').trim(),
-        limit: 500
+        table: String(dbConfig.table || 'summary').trim()
       })
 
       const pegs = response?.data?.pegs || (Array.isArray(response?.data?.items) ? response.data.items.map(v => ({ id: v, name: v })) : (Array.isArray(response?.data) ? response.data.map(v => ({ id: v, name: v })) : []))
