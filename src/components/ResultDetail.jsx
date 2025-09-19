@@ -1,26 +1,45 @@
 /**
  * ResultDetail.jsx
- * 
+ *
  * LLM 분석 결과의 상세 정보를 표시하는 모달 컴포넌트
  * 단일 결과 상세 보기 및 다중 결과 비교 기능을 제공합니다.
  * Task 52: LLM 분석 결과 상세 보기 및 비교 기능 UI 구현
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  memo,
+} from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog.jsx'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card.jsx'
-import { Button } from '@/components/ui/button.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
-import { Input } from '@/components/ui/input.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
-import { ScrollArea } from '@/components/ui/scroll-area.jsx'
-import { Separator } from '@/components/ui/separator.jsx'
+} from "@/components/ui/dialog.jsx";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card.jsx";
+import { Button } from "@/components/ui/button.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+import { Input } from "@/components/ui/input.jsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.jsx";
+import { ScrollArea } from "@/components/ui/scroll-area.jsx";
+import { Separator } from "@/components/ui/separator.jsx";
 import {
   LineChart,
   Line,
@@ -34,8 +53,8 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
-} from 'recharts'
+  Cell,
+} from "recharts";
 import {
   Calendar,
   MapPin,
@@ -65,212 +84,235 @@ import {
   Clock,
   Gauge,
   HelpCircle,
-  Info
-} from 'lucide-react'
-import { toast } from 'sonner'
-import apiClient from '@/lib/apiClient.js'
+  Info,
+} from "lucide-react";
+import { toast } from "sonner";
+import apiClient from "@/lib/apiClient.js";
 
-const ResultDetail = ({ 
-  isOpen, 
-  onClose, 
+const ResultDetail = ({
+  isOpen,
+  onClose,
   resultIds = [], // 단일 ID 또는 비교용 ID 배열
-  mode = 'single' // 'single' | 'compare'
+  mode = "single", // 'single' | 'compare'
 }) => {
   // === 상태 관리 ===
-  const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // === 새로운 알고리즘 결과 상태 ===
-  const [choiAlgorithmResult, setChoiAlgorithmResult] = useState('absent') // Choi 알고리즘 결과
-  const [mahalanobisResult, setMahalanobisResult] = useState(null) // 마할라노비스 거리 결과
-  const [pegComparisonResult, setPegComparisonResult] = useState(null) // PEG 비교 결과
+  const [choiAlgorithmResult, setChoiAlgorithmResult] = useState("absent"); // Choi 알고리즘 결과
+  const [mahalanobisResult, setMahalanobisResult] = useState(null); // 마할라노비스 거리 결과
+  const [pegComparisonResult, setPegComparisonResult] = useState(null); // PEG 비교 결과
 
   // === 도움말 모달 상태 ===
   const [helpModal, setHelpModal] = useState({
     isOpen: false,
-    algorithm: null // 'choi', 'mahalanobis', 'mann-whitney', 'ks-test', 'peg-comparison'
-  })
-  
+    algorithm: null, // 'choi', 'mahalanobis', 'mann-whitney', 'ks-test', 'peg-comparison'
+  });
+
   // === 키보드 단축키 지원 ===
   useEffect(() => {
     const handleKeydown = (event) => {
-      if (event.key === 'F11') {
-        event.preventDefault()
-        setIsFullscreen(prev => !prev)
-      } else if (event.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false)
+      if (event.key === "F11") {
+        event.preventDefault();
+        setIsFullscreen((prev) => !prev);
+      } else if (event.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
       }
-    }
-    
+    };
+
     if (isOpen) {
-      window.addEventListener('keydown', handleKeydown)
-      return () => window.removeEventListener('keydown', handleKeydown)
+      window.addEventListener("keydown", handleKeydown);
+      return () => window.removeEventListener("keydown", handleKeydown);
     }
-  }, [isOpen, isFullscreen])
-  
+  }, [isOpen, isFullscreen]);
+
   // === PEG 차트 제어 상태 ===
-  const [pegPage, setPegPage] = useState(0)
-  const [pegPageSize, setPegPageSize] = useState(10)
-  const [pegFilter, setPegFilter] = useState('')
-  const [weightFilter, setWeightFilter] = useState('all') // all, high(>=8), medium(6-7.9), low(<6)
-  const [trendFilter, setTrendFilter] = useState('all') // all, up, down, stable
+  const [pegPage, setPegPage] = useState(0);
+  const [pegPageSize, setPegPageSize] = useState(10);
+  const [pegFilter, setPegFilter] = useState("");
+  const [weightFilter, setWeightFilter] = useState("all"); // all, high(>=8), medium(6-7.9), low(<6)
+  const [trendFilter, setTrendFilter] = useState("all"); // all, up, down, stable
 
   // === 메모리 최적화: 큰 데이터 청크 단위 처리 ===
-  const [dataChunkSize] = useState(50) // 한 번에 처리할 데이터 청크 크기
+  const [dataChunkSize] = useState(50); // 한 번에 처리할 데이터 청크 크기
 
-  const isCompareMode = mode === 'compare' && resultIds.length > 1
-  const isSingleMode = mode === 'single' && resultIds.length === 1
+  const isCompareMode = mode === "compare" && resultIds.length > 1;
+  const isSingleMode = mode === "single" && resultIds.length === 1;
 
   // === API 호출 (청크 단위 처리로 메모리 최적화) ===
   const fetchResultDetails = async (ids) => {
-    setLoading(true)
-    setError(null)
+    setLoading(true);
+    setError(null);
 
     // 이전 요청이 있으면 취소
     if (abortControllerRef.current) {
-      console.log('⏹️ 이전 요청 취소')
-      abortControllerRef.current.abort()
+      console.log("⏹️ 이전 요청 취소");
+      abortControllerRef.current.abort();
     }
 
     // 새로운 AbortController 생성 및 저장
-    const abortController = new AbortController()
-    abortControllerRef.current = abortController
-    const signal = abortController.signal
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const signal = abortController.signal;
 
     try {
-      console.log('📊 분석 결과 상세 정보 요청:', ids)
+      console.log("📊 분석 결과 상세 정보 요청:", ids);
 
       // ID 유효성 검증 및 정리
-      const validIds = ids.filter(id => {
-        if (!id || typeof id !== 'string' && typeof id !== 'number') {
-          console.warn(`⚠️ 잘못된 ID 형식 감지:`, id, typeof id)
-          return false
-        }
-        
-        const idStr = String(id).trim()
-        if (!idStr || idStr === 'undefined' || idStr === 'null') {
-          console.warn(`⚠️ 빈 ID 감지:`, id)
-          return false
-        }
-        
-        // ID 형식 검증 (숫자, UUID, 또는 특정 패턴)
-        const isValidFormat = /^[a-zA-Z0-9_-]+$/.test(idStr) && idStr.length > 0 && idStr.length <= 100
-        if (!isValidFormat) {
-          console.warn(`⚠️ 잘못된 ID 형식:`, idStr)
-          return false
-        }
-        
-        return true
-      }).map(id => String(id).trim())
-      
+      const validIds = ids
+        .filter((id) => {
+          if (!id || (typeof id !== "string" && typeof id !== "number")) {
+            console.warn(`⚠️ 잘못된 ID 형식 감지:`, id, typeof id);
+            return false;
+          }
+
+          const idStr = String(id).trim();
+          if (!idStr || idStr === "undefined" || idStr === "null") {
+            console.warn(`⚠️ 빈 ID 감지:`, id);
+            return false;
+          }
+
+          // ID 형식 검증 (숫자, UUID, 또는 특정 패턴)
+          const isValidFormat =
+            /^[a-zA-Z0-9_-]+$/.test(idStr) &&
+            idStr.length > 0 &&
+            idStr.length <= 100;
+          if (!isValidFormat) {
+            console.warn(`⚠️ 잘못된 ID 형식:`, idStr);
+            return false;
+          }
+
+          return true;
+        })
+        .map((id) => String(id).trim());
+
       if (validIds.length === 0) {
-        throw new Error('유효한 결과 ID가 없습니다.')
+        throw new Error("유효한 결과 ID가 없습니다.");
       }
-      
+
       if (validIds.length !== ids.length) {
-        console.warn(`⚠️ ${ids.length - validIds.length}개의 잘못된 ID가 제거되었습니다.`)
+        console.warn(
+          `⚠️ ${ids.length - validIds.length}개의 잘못된 ID가 제거되었습니다.`
+        );
       }
-      
-      console.log(`📊 유효한 ID 목록:`, validIds)
+
+      console.log(`📊 유효한 ID 목록:`, validIds);
 
       // 메모리 효율을 위해 청크 단위로 처리 (서버 부하 고려하여 청크 크기 조정)
-      const chunks = []
-      const adjustedChunkSize = Math.min(dataChunkSize, 3) // 서버 부하 방지를 위해 최대 3개씩 처리
+      const chunks = [];
+      const adjustedChunkSize = Math.min(dataChunkSize, 3); // 서버 부하 방지를 위해 최대 3개씩 처리
       for (let i = 0; i < validIds.length; i += adjustedChunkSize) {
-        chunks.push(validIds.slice(i, i + adjustedChunkSize))
+        chunks.push(validIds.slice(i, i + adjustedChunkSize));
       }
-      
-      console.log(`📊 청크 처리 정보: 총 ${validIds.length}개 항목을 ${chunks.length}개 청크로 분할 (청크당 최대 ${adjustedChunkSize}개)`)
 
-      let allResults = []
+      console.log(
+        `📊 청크 처리 정보: 총 ${validIds.length}개 항목을 ${chunks.length}개 청크로 분할 (청크당 최대 ${adjustedChunkSize}개)`
+      );
+
+      let allResults = [];
 
       for (const chunk of chunks) {
         const promises = chunk.map(async (id) => {
           try {
             // 요청이 취소되었는지 확인
             if (signal.aborted) {
-              throw new Error('요청이 취소되었습니다')
+              throw new Error("요청이 취소되었습니다");
             }
-            
+
             // 500 에러에 대한 재시도 로직 추가
-            let retryCount = 0
-            const maxRetries = 2
-            let lastError = null
-            
+            let retryCount = 0;
+            const maxRetries = 2;
+            let lastError = null;
+
             while (retryCount <= maxRetries) {
               try {
                 // URL 인코딩으로 안전한 요청 보장
-                const encodedId = encodeURIComponent(id)
-                const requestUrl = `/api/analysis/results/${encodedId}`
-                
-                console.log(`🌐 API 요청: ${requestUrl} (원본 ID: ${id})`)
-                
-                const response = await apiClient.get(requestUrl, { 
+                const encodedId = encodeURIComponent(id);
+                const requestUrl = `/api/analysis/results/${encodedId}`;
+
+                console.log(`🌐 API 요청: ${requestUrl} (원본 ID: ${id})`);
+
+                const response = await apiClient.get(requestUrl, {
                   signal,
                   timeout: 10000, // 10초 타임아웃
                   headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                  }
-                })
-                
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                  },
+                });
+
                 // 응답 데이터 검증
                 if (!response.data) {
-                  throw new Error('서버에서 빈 응답을 반환했습니다.')
+                  throw new Error("서버에서 빈 응답을 반환했습니다.");
                 }
-                
-                console.log(`✅ 결과 ${id} 로딩 성공 (시도 ${retryCount + 1}/${maxRetries + 1})`)
-                return { ...response.data, id }
+
+                console.log(
+                  `✅ 결과 ${id} 로딩 성공 (시도 ${retryCount + 1}/${
+                    maxRetries + 1
+                  })`
+                );
+                return { ...response.data, id };
               } catch (err) {
-                lastError = err
-                
+                lastError = err;
+
                 // 요청 취소된 경우
                 if (signal.aborted) {
-                  throw new Error('요청이 취소되었습니다')
+                  throw new Error("요청이 취소되었습니다");
                 }
-                
+
                 // 네트워크 에러인 경우
-                if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
-                  console.warn(`🌐 네트워크 에러 - 결과 ${id}:`, err.message)
+                if (
+                  err.code === "NETWORK_ERROR" ||
+                  err.message?.includes("Network Error")
+                ) {
+                  console.warn(`🌐 네트워크 에러 - 결과 ${id}:`, err.message);
                   if (retryCount < maxRetries) {
-                    retryCount++
-                    const delay = 2000 // 네트워크 에러는 2초 대기
-                    console.warn(`⚠️ 네트워크 에러로 인한 재시도, ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`)
-                    await new Promise(resolve => setTimeout(resolve, delay))
-                    continue
+                    retryCount++;
+                    const delay = 2000; // 네트워크 에러는 2초 대기
+                    console.warn(
+                      `⚠️ 네트워크 에러로 인한 재시도, ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`
+                    );
+                    await new Promise((resolve) => setTimeout(resolve, delay));
+                    continue;
                   }
                 }
-                
+
                 // 500 에러이고 재시도 가능한 경우
                 if (err?.response?.status === 500 && retryCount < maxRetries) {
-                  retryCount++
-                  const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000) // 지수 백오프, 최대 5초
-                  console.warn(`⚠️ 결과 ${id} 500 에러 발생, ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`)
-                  await new Promise(resolve => setTimeout(resolve, delay))
-                  continue
+                  retryCount++;
+                  const delay = Math.min(
+                    1000 * Math.pow(2, retryCount - 1),
+                    5000
+                  ); // 지수 백오프, 최대 5초
+                  console.warn(
+                    `⚠️ 결과 ${id} 500 에러 발생, ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, delay));
+                  continue;
                 }
-                
+
                 // 404 에러인 경우 (존재하지 않는 ID)
                 if (err?.response?.status === 404) {
-                  console.warn(`⚠️ 결과 ${id}를 찾을 수 없습니다 (404)`)
-                  throw new Error(`분석 결과를 찾을 수 없습니다 (ID: ${id})`)
+                  console.warn(`⚠️ 결과 ${id}를 찾을 수 없습니다 (404)`);
+                  throw new Error(`분석 결과를 찾을 수 없습니다 (ID: ${id})`);
                 }
-                
+
                 // 재시도 불가능하거나 다른 에러인 경우
-                throw err
+                throw err;
               }
             }
-            
-            throw lastError
+
+            throw lastError;
           } catch (err) {
             // 취소된 요청은 에러로 처리하지 않음
             if (signal.aborted) {
-              console.log(`⏹️ 결과 ${id} 요청 취소됨`)
-              return null
+              console.log(`⏹️ 결과 ${id} 요청 취소됨`);
+              return null;
             }
-            
+
             // 에러 타입별 상세 로깅 및 분류
             const errorInfo = {
               id,
@@ -279,119 +321,137 @@ const ResultDetail = ({
               url: err?.config?.url,
               method: err?.config?.method,
               retryAttempts: maxRetries + 1,
-              timestamp: new Date().toISOString()
-            }
-            
+              timestamp: new Date().toISOString(),
+            };
+
             if (err?.response?.status === 500) {
-              console.error(`❌ 결과 ${id} 서버 내부 오류 (500) - 재시도 실패:`, errorInfo)
+              console.error(
+                `❌ 결과 ${id} 서버 내부 오류 (500) - 재시도 실패:`,
+                errorInfo
+              );
             } else if (err?.response?.status === 404) {
-              console.warn(`⚠️ 결과 ${id}를 찾을 수 없음 (404):`, errorInfo)
+              console.warn(`⚠️ 결과 ${id}를 찾을 수 없음 (404):`, errorInfo);
             } else if (err?.response?.status === 400) {
-              console.warn(`⚠️ 결과 ${id} 잘못된 요청 (400):`, errorInfo)
-            } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
-              console.error(`🌐 결과 ${id} 네트워크 오류:`, errorInfo)
+              console.warn(`⚠️ 결과 ${id} 잘못된 요청 (400):`, errorInfo);
+            } else if (
+              err.code === "NETWORK_ERROR" ||
+              err.message?.includes("Network Error")
+            ) {
+              console.error(`🌐 결과 ${id} 네트워크 오류:`, errorInfo);
             } else {
-              console.error(`❌ 결과 ${id} 로딩 실패:`, errorInfo)
+              console.error(`❌ 결과 ${id} 로딩 실패:`, errorInfo);
             }
-            
+
             // 사용자 친화적인 에러 메시지 생성
-            let userMessage = '로딩 실패'
-            let errorType = 'unknown_error'
-            
+            let userMessage = "로딩 실패";
+            let errorType = "unknown_error";
+
             if (err?.response?.status === 500) {
-              userMessage = '서버 내부 오류 (잠시 후 다시 시도해주세요)'
-              errorType = 'server_error'
+              userMessage = "서버 내부 오류 (잠시 후 다시 시도해주세요)";
+              errorType = "server_error";
             } else if (err?.response?.status === 404) {
-              userMessage = '분석 결과를 찾을 수 없습니다'
-              errorType = 'not_found'
+              userMessage = "분석 결과를 찾을 수 없습니다";
+              errorType = "not_found";
             } else if (err?.response?.status === 400) {
-              userMessage = '잘못된 요청입니다'
-              errorType = 'bad_request'
-            } else if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
-              userMessage = '네트워크 연결 오류'
-              errorType = 'network_error'
-            } else if (err.message?.includes('timeout')) {
-              userMessage = '요청 시간 초과'
-              errorType = 'timeout_error'
+              userMessage = "잘못된 요청입니다";
+              errorType = "bad_request";
+            } else if (
+              err.code === "NETWORK_ERROR" ||
+              err.message?.includes("Network Error")
+            ) {
+              userMessage = "네트워크 연결 오류";
+              errorType = "network_error";
+            } else if (err.message?.includes("timeout")) {
+              userMessage = "요청 시간 초과";
+              errorType = "timeout_error";
             } else {
-              userMessage = err.message || '알 수 없는 오류가 발생했습니다'
-              errorType = 'client_error'
+              userMessage = err.message || "알 수 없는 오류가 발생했습니다";
+              errorType = "client_error";
             }
-            
+
             return {
               id,
               error: userMessage,
               analysisDate: new Date().toISOString(),
-              neId: '-',
-              cellId: '-',
-              status: 'error',
+              neId: "-",
+              cellId: "-",
+              status: "error",
               errorType,
-              errorDetails: errorInfo
-            }
+              errorDetails: errorInfo,
+            };
           }
-        })
+        });
 
-        const chunkResults = await Promise.all(promises)
+        const chunkResults = await Promise.all(promises);
         // null 값 제거 (취소된 요청)
-        const validResults = chunkResults.filter(result => result !== null)
-        allResults = [...allResults, ...validResults]
+        const validResults = chunkResults.filter((result) => result !== null);
+        allResults = [...allResults, ...validResults];
 
         // 메모리 효율을 위해 중간 결과 정리 (브라우저 환경에서 안전하게 처리)
-        if (typeof window !== 'undefined' && window.gc) {
-          window.gc()
+        if (typeof window !== "undefined" && window.gc) {
+          window.gc();
         }
-        
+
         // 서버 부하 분산을 위해 청크 간 지연 추가 (마지막 청크 제외)
         if (chunks.indexOf(chunk) < chunks.length - 1) {
-          const delay = 200 // 200ms 지연
-          console.log(`⏳ 서버 부하 분산을 위해 ${delay}ms 대기 중...`)
-          await new Promise(resolve => setTimeout(resolve, delay))
+          const delay = 200; // 200ms 지연
+          console.log(`⏳ 서버 부하 분산을 위해 ${delay}ms 대기 중...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
 
       // 요청이 취소되지 않았을 때만 결과 설정
       if (!signal.aborted) {
-        setResults(allResults)
-        
+        setResults(allResults);
+
         // 에러 통계 계산 및 로깅
-        const errorStats = allResults.reduce((stats, result) => {
-          if (result.error) {
-            stats.totalErrors++
-            if (result.errorType === 'server_error') {
-              stats.serverErrors++
+        const errorStats = allResults.reduce(
+          (stats, result) => {
+            if (result.error) {
+              stats.totalErrors++;
+              if (result.errorType === "server_error") {
+                stats.serverErrors++;
+              } else {
+                stats.clientErrors++;
+              }
             } else {
-              stats.clientErrors++
+              stats.successCount++;
             }
-          } else {
-            stats.successCount++
-          }
-          return stats
-        }, { totalErrors: 0, serverErrors: 0, clientErrors: 0, successCount: 0 })
-        
-        console.log('✅ 분석 결과 상세 정보 로딩 완료:', {
+            return stats;
+          },
+          { totalErrors: 0, serverErrors: 0, clientErrors: 0, successCount: 0 }
+        );
+
+        console.log("✅ 분석 결과 상세 정보 로딩 완료:", {
           totalItems: allResults.length,
           successCount: errorStats.successCount,
           errorCount: errorStats.totalErrors,
           serverErrors: errorStats.serverErrors,
           clientErrors: errorStats.clientErrors,
-          successRate: `${((errorStats.successCount / allResults.length) * 100).toFixed(1)}%`
-        })
-        
+          successRate: `${(
+            (errorStats.successCount / allResults.length) *
+            100
+          ).toFixed(1)}%`,
+        });
+
         // 서버 에러가 많이 발생한 경우 사용자에게 알림
         if (errorStats.serverErrors > 0) {
-          const errorRate = (errorStats.serverErrors / allResults.length) * 100
-          if (errorRate > 30) { // 30% 이상 서버 에러 발생 시
-            toast.warning(`일부 데이터 로딩에 실패했습니다 (서버 에러: ${errorStats.serverErrors}개). 잠시 후 다시 시도해주세요.`)
+          const errorRate = (errorStats.serverErrors / allResults.length) * 100;
+          if (errorRate > 30) {
+            // 30% 이상 서버 에러 발생 시
+            toast.warning(
+              `일부 데이터 로딩에 실패했습니다 (서버 에러: ${errorStats.serverErrors}개). 잠시 후 다시 시도해주세요.`
+            );
           }
         }
       } else {
-        console.log('⏹️ 요청이 취소되어 결과 설정을 건너뜀')
+        console.log("⏹️ 요청이 취소되어 결과 설정을 건너뜀");
       }
-      
+
       // 첫 번째 결과의 데이터 구조 로깅
       if (allResults.length > 0) {
-        const firstResult = allResults[0]
-        console.log('📋 첫 번째 결과 상세 구조:', {
+        const firstResult = allResults[0];
+        console.log("📋 첫 번째 결과 상세 구조:", {
           id: firstResult.id,
           hasKpiResults: !!firstResult.kpiResults,
           hasStats: !!firstResult.stats,
@@ -399,27 +459,28 @@ const ResultDetail = ({
           statsType: typeof firstResult.stats,
           statsIsArray: Array.isArray(firstResult.stats),
           allKeys: Object.keys(firstResult),
-          kpiResultsKeys: firstResult.kpiResults ? Object.keys(firstResult.kpiResults) : 'N/A',
-          statsLength: firstResult.stats?.length || 'N/A'
-        })
+          kpiResultsKeys: firstResult.kpiResults
+            ? Object.keys(firstResult.kpiResults)
+            : "N/A",
+          statsLength: firstResult.stats?.length || "N/A",
+        });
       }
-
     } catch (err) {
       // 취소된 요청은 에러로 처리하지 않음
       if (signal.aborted) {
-        console.log('⏹️ 요청이 취소되어 에러 처리 건너뜀')
-        return
+        console.log("⏹️ 요청이 취소되어 에러 처리 건너뜀");
+        return;
       }
-      console.error('❌ 분석 결과 상세 정보 로딩 실패:', err)
-      setError(err.message || '데이터 로딩에 실패했습니다')
-      toast.error('분석 결과를 불러오는데 실패했습니다')
+      console.error("❌ 분석 결과 상세 정보 로딩 실패:", err);
+      setError(err.message || "데이터 로딩에 실패했습니다");
+      toast.error("분석 결과를 불러오는데 실패했습니다");
     } finally {
       // 취소된 요청이 아닐 때만 로딩 상태 해제
       if (!signal.aborted) {
-        setLoading(false)
+        setLoading(false);
       }
     }
-  }
+  };
 
   // === 통계 테스트 함수들 ===
 
@@ -427,296 +488,229 @@ const ResultDetail = ({
   const mannWhitneyUTest = useCallback((sample1, sample2) => {
     try {
       // 두 샘플을 결합하고 순위 부여
-      const combined = [...sample1, ...sample2]
-      const sortedCombined = combined.slice().sort((a, b) => a - b)
+      const combined = [...sample1, ...sample2];
+      const sortedCombined = combined.slice().sort((a, b) => a - b);
 
       // 순위 계산
-      const ranks = combined.map(value => {
-        const rank = sortedCombined.indexOf(value) + 1
+      const ranks = combined.map((value) => {
+        const rank = sortedCombined.indexOf(value) + 1;
         // 동점 처리 (평균 순위)
-        const duplicates = combined.filter(v => v === value).length
-        const firstIndex = sortedCombined.indexOf(value)
-        return duplicates > 1 ?
-          (firstIndex + 1 + firstIndex + duplicates) / 2 :
-          rank
-      })
+        const duplicates = combined.filter((v) => v === value).length;
+        const firstIndex = sortedCombined.indexOf(value);
+        return duplicates > 1
+          ? (firstIndex + 1 + firstIndex + duplicates) / 2
+          : rank;
+      });
 
       // 각 그룹의 순위 합 계산
-      const n1 = sample1.length
-      const n2 = sample2.length
+      const n1 = sample1.length;
+      const n2 = sample2.length;
       const rankSum1 = sample1.reduce((sum, value, index) => {
-        const originalIndex = combined.indexOf(value)
-        return sum + ranks[originalIndex]
-      }, 0)
+        const originalIndex = combined.indexOf(value);
+        return sum + ranks[originalIndex];
+      }, 0);
 
       // U 통계량 계산
-      const U1 = rankSum1 - (n1 * (n1 + 1)) / 2
-      const U2 = n1 * n2 - U1
-      const U = Math.min(U1, U2)
+      const U1 = rankSum1 - (n1 * (n1 + 1)) / 2;
+      const U2 = n1 * n2 - U1;
+      const U = Math.min(U1, U2);
 
       // Z-score 계산 (근사)
-      const mu_U = (n1 * n2) / 2
-      const sigma_U = Math.sqrt((n1 * n2 * (n1 + n2 + 1)) / 12)
-      const zScore = (U - mu_U) / sigma_U
+      const mu_U = (n1 * n2) / 2;
+      const sigma_U = Math.sqrt((n1 * n2 * (n1 + n2 + 1)) / 12);
+      const zScore = (U - mu_U) / sigma_U;
 
       // p-value 계산 (양측 검정)
-      const pValue = 2 * (1 - Math.abs(zScore) / Math.sqrt(2 * Math.PI) * Math.exp(-zScore * zScore / 2))
+      const pValue =
+        2 *
+        (1 -
+          (Math.abs(zScore) / Math.sqrt(2 * Math.PI)) *
+            Math.exp((-zScore * zScore) / 2));
 
       return {
         U: U,
         zScore: zScore,
         pValue: Math.min(pValue, 1), // p-value는 최대 1
         significant: pValue < 0.05,
-        effectSize: Math.abs(zScore) / Math.sqrt(n1 + n2)
-      }
+        effectSize: Math.abs(zScore) / Math.sqrt(n1 + n2),
+      };
     } catch (error) {
-      console.error('Mann-Whitney U Test 오류:', error)
-      return { error: '통계 테스트 실패' }
+      console.error("Mann-Whitney U Test 오류:", error);
+      return { error: "통계 테스트 실패" };
     }
-  }, [])
+  }, []);
 
   // Kolmogorov-Smirnov Test 구현
   const kolmogorovSmirnovTest = useCallback((sample1, sample2) => {
     try {
       // 두 샘플 정렬
-      const sorted1 = sample1.slice().sort((a, b) => a - b)
-      const sorted2 = sample2.slice().sort((a, b) => a - b)
+      const sorted1 = sample1.slice().sort((a, b) => a - b);
+      const sorted2 = sample2.slice().sort((a, b) => a - b);
 
-      const n1 = sorted1.length
-      const n2 = sorted2.length
+      const n1 = sorted1.length;
+      const n2 = sorted2.length;
 
-      let maxDifference = 0
-      let i = 0, j = 0
+      let maxDifference = 0;
+      let i = 0,
+        j = 0;
 
       // 모든 고유 값에 대해 CDF 차이 계산
-      const allValues = [...new Set([...sorted1, ...sorted2])].sort((a, b) => a - b)
+      const allValues = [...new Set([...sorted1, ...sorted2])].sort(
+        (a, b) => a - b
+      );
 
       for (const value of allValues) {
         // sample1의 CDF
-        while (i < n1 && sorted1[i] <= value) i++
-        const cdf1 = i / n1
+        while (i < n1 && sorted1[i] <= value) i++;
+        const cdf1 = i / n1;
 
         // sample2의 CDF
-        while (j < n2 && sorted2[j] <= value) j++
-        const cdf2 = j / n2
+        while (j < n2 && sorted2[j] <= value) j++;
+        const cdf2 = j / n2;
 
-        const difference = Math.abs(cdf1 - cdf2)
+        const difference = Math.abs(cdf1 - cdf2);
         if (difference > maxDifference) {
-          maxDifference = difference
+          maxDifference = difference;
         }
       }
 
       // D 통계량
-      const D = maxDifference
+      const D = maxDifference;
 
       // 근사 p-value 계산 (양측 검정)
-      const lambda = D * Math.sqrt((n1 * n2) / (n1 + n2))
-      const pValue = 2 * Math.exp(-2 * lambda * lambda)
+      const lambda = D * Math.sqrt((n1 * n2) / (n1 + n2));
+      const pValue = 2 * Math.exp(-2 * lambda * lambda);
 
       return {
         D: D,
         lambda: lambda,
         pValue: Math.min(pValue, 1),
         significant: pValue < 0.05,
-        distributionDifference: D > 0.1 ? 'large' : D > 0.05 ? 'medium' : 'small'
-      }
+        distributionDifference:
+          D > 0.1 ? "large" : D > 0.05 ? "medium" : "small",
+      };
     } catch (error) {
-      console.error('Kolmogorov-Smirnov Test 오류:', error)
-      return { error: '분포 테스트 실패' }
+      console.error("Kolmogorov-Smirnov Test 오류:", error);
+      return { error: "분포 테스트 실패" };
     }
-  }, [])
+  }, []);
 
-  // === 마할라노비스 거리 계산 함수 ===
-  const calculateMahalanobisDistance = useCallback((kpiData) => {
+  // === 마할라노비스 거리 계산 함수 (백엔드 API 호출) ===
+  const calculateMahalanobisDistance = useCallback(async (kpiData) => {
     try {
-      console.log('🧮 마할라노비스 거리 계산 시작', kpiData)
+      console.log("🧮 마할라노비스 거리 계산 시작 - 백엔드 API 호출", kpiData);
 
-      // 1차 스크리닝: 종합 건강 상태 진단
-      const kpiCount = Object.keys(kpiData).length
-      const abnormalKpis = []
-
-      // 각 KPI에 대해 마할라노비스 거리 계산 (간소화된 버전)
-      Object.entries(kpiData).forEach(([kpiName, values]) => {
-        if (values && values.length >= 2) {
-          const n1Value = values[0] // N-1 값
-          const nValue = values[values.length - 1] // N 값
-
-          // 변화율 계산
-          const changeRate = n1Value !== 0 ? Math.abs((nValue - n1Value) / n1Value) : 0
-
-          // 임계치 초과 시 이상으로 판정
-          if (changeRate > 0.1) { // 10% 이상 변화
-            abnormalKpis.push({
-              kpiName,
-              n1Value,
-              nValue,
-              changeRate,
-              severity: changeRate > 0.3 ? 'critical' : changeRate > 0.2 ? 'warning' : 'caution'
-            })
-          }
+      // 백엔드 API를 통해 마할라노비스 분석 수행
+      const result = await performMahalanobisAnalysis(
+        {
+          kpiData,
+          timestamps: [], // 시간 정보는 현재 데이터에서 추출하지 않음
+          periodLabels: [],
+        },
+        {
+          threshold: 0.1,
+          sampleSize: 10,
+          significanceLevel: 0.05,
         }
-      })
+      );
 
-      // 종합 이상 점수 계산
-      const abnormalScore = abnormalKpis.length / kpiCount
+      console.log(
+        "✅ 마할라노비스 거리 계산 및 통계 테스트 완료 (백엔드 API)",
+        result
+      );
 
-      // 임계치 기반 알람 판정
-      let alarmLevel = 'normal'
-      if (abnormalScore > 0.3) alarmLevel = 'critical'
-      else if (abnormalScore > 0.2) alarmLevel = 'warning'
-      else if (abnormalScore > 0.1) alarmLevel = 'caution'
-
-      // 2차 심층 분석: Top-N KPI에 대한 통계 테스트
-      const topAbnormalKpis = abnormalKpis.slice(0, 5)
-      const statisticalAnalysis = []
-
-      console.log('🔬 2차 심층 분석 시작 - 통계 테스트 수행')
-
-      for (const kpi of topAbnormalKpis) {
-        try {
-          // 실제 데이터에서 N-1과 N 기간 샘플 추출 (더미 데이터 생성)
-          const n1Samples = Array.from({ length: 20 }, () => kpi.n1Value + (Math.random() - 0.5) * kpi.n1Value * 0.1)
-          const nSamples = Array.from({ length: 20 }, () => kpi.nValue + (Math.random() - 0.5) * kpi.nValue * 0.1)
-
-          // Mann-Whitney U Test 수행
-          const mannWhitneyResult = mannWhitneyUTest(n1Samples, nSamples)
-
-          // Kolmogorov-Smirnov Test 수행
-          const ksResult = kolmogorovSmirnovTest(n1Samples, nSamples)
-
-          statisticalAnalysis.push({
-            kpiName: kpi.kpiName,
-            changeRate: kpi.changeRate,
-            severity: kpi.severity,
-            statisticalTests: {
-              mannWhitney: {
-                U: mannWhitneyResult.U,
-                zScore: mannWhitneyResult.zScore,
-                pValue: mannWhitneyResult.pValue,
-                significant: mannWhitneyResult.significant,
-                effectSize: mannWhitneyResult.effectSize,
-                interpretation: mannWhitneyResult.significant
-                  ? `통계적으로 유의한 차이 (p=${mannWhitneyResult.pValue.toFixed(4)})`
-                  : `통계적으로 유의하지 않은 차이 (p=${mannWhitneyResult.pValue.toFixed(4)})`
-              },
-              kolmogorovSmirnov: {
-                D: ksResult.D,
-                pValue: ksResult.pValue,
-                significant: ksResult.significant,
-                distributionDifference: ksResult.distributionDifference,
-                interpretation: ksResult.significant
-                  ? `분포에 유의한 차이 (D=${ksResult.D.toFixed(4)}, p=${ksResult.pValue.toFixed(4)})`
-                  : `분포 차이 미미 (D=${ksResult.D.toFixed(4)}, p=${ksResult.pValue.toFixed(4)})`
-              }
-            },
-            sampleSizes: {
-              n1: n1Samples.length,
-              n: nSamples.length
-            },
-            confidence: mannWhitneyResult.significant && ksResult.significant ? 'high' :
-                        mannWhitneyResult.significant || ksResult.significant ? 'medium' : 'low'
-          })
-
-        } catch (error) {
-          console.error(`통계 테스트 실패 - ${kpi.kpiName}:`, error)
-          statisticalAnalysis.push({
-            kpiName: kpi.kpiName,
-            changeRate: kpi.changeRate,
-            severity: kpi.severity,
-            statisticalTests: { error: '통계 테스트 수행 실패' },
-            confidence: 'unknown'
-          })
-        }
+      // 백엔드 응답을 기존 UI가 기대하는 형식으로 변환
+      if (result.success === false) {
+        return {
+          error: result.message || "백엔드 분석 실패",
+          timestamp: new Date().toISOString(),
+        };
       }
 
-      const result = {
-        totalKpis: kpiCount,
-        abnormalKpis: abnormalKpis,
-        abnormalScore,
-        alarmLevel,
-        timestamp: new Date().toISOString(),
-        analysis: {
-          screening: {
-            status: alarmLevel,
-            score: abnormalScore,
-            threshold: 0.1,
-            description: abnormalScore > 0.1 ? '비정상 패턴 감지됨' : '정상 범위 내'
-          },
-          drilldown: {
-            topAbnormalKpis: topAbnormalKpis,
-            statisticalAnalysis: statisticalAnalysis,
-            statisticalTests: 'Mann-Whitney U Test, K-S Test 완료',
-            changePointDetection: '변화점 탐지 알고리즘 적용 예정',
-            summary: {
-              totalAnalyzed: statisticalAnalysis.length,
-              statisticallySignificant: statisticalAnalysis.filter(s => s.confidence === 'high' || s.confidence === 'medium').length,
-              highConfidenceFindings: statisticalAnalysis.filter(s => s.confidence === 'high').length,
-              distributionChanges: statisticalAnalysis.filter(s =>
-                s.statisticalTests?.kolmogorovSmirnov?.significant
-              ).length
-            }
-          }
-        }
-      }
-
-      console.log('✅ 마할라노비스 거리 계산 및 통계 테스트 완료', result)
-      return result
-
+      return result.data;
     } catch (error) {
-      console.error('❌ 마할라노비스 거리 계산 실패', error)
+      console.error("❌ 마할라노비스 거리 계산 실패 (백엔드 API)", error);
       return {
-        error: '계산 중 오류 발생',
-        timestamp: new Date().toISOString()
-      }
+        error: error.message || "계산 중 오류 발생",
+        timestamp: new Date().toISOString(),
+      };
     }
-  }, [mannWhitneyUTest, kolmogorovSmirnovTest])
+  }, []);
 
   // === PEG 비교 결과 계산 함수 ===
   const calculatePegComparison = useCallback((result) => {
     try {
-      console.log('📊 PEG 비교 결과 계산 시작', result)
+      console.log("📊 PEG 비교 결과 계산 시작", result);
 
       if (!result?.stats || !Array.isArray(result.stats)) {
-        return null
+        return null;
       }
 
-      const stats = result.stats
-      const pegResults = {}
+      const stats = result.stats;
+      const pegResults = {};
 
       // PEG별로 N-1과 N 기간 데이터 그룹화
-      stats.forEach(stat => {
-        const pegName = stat.kpi_name
+      stats.forEach((stat) => {
+        const pegName = stat.kpi_name;
         if (!pegResults[pegName]) {
           pegResults[pegName] = {
             peg_name: pegName,
             n1_values: [],
             n_values: [],
-            weight: result.request_params?.peg_definitions?.[pegName]?.weight || 5
-          }
+            weight:
+              result.request_params?.peg_definitions?.[pegName]?.weight || 5,
+          };
         }
 
-        if (stat.period === 'N-1') {
-          pegResults[pegName].n1_values.push(stat.avg)
-        } else if (stat.period === 'N') {
-          pegResults[pegName].n_values.push(stat.avg)
+        if (stat.period === "N-1") {
+          pegResults[pegName].n1_values.push(stat.avg);
+        } else if (stat.period === "N") {
+          pegResults[pegName].n_values.push(stat.avg);
         }
-      })
+      });
 
       // 각 PEG에 대해 통계 계산
-      const comparisonResults = Object.values(pegResults).map(peg => {
-        const n1Avg = peg.n1_values.length > 0 ? peg.n1_values.reduce((a, b) => a + b, 0) / peg.n1_values.length : 0
-        const nAvg = peg.n_values.length > 0 ? peg.n_values.reduce((a, b) => a + b, 0) / peg.n_values.length : 0
+      const comparisonResults = Object.values(pegResults).map((peg) => {
+        const n1Avg =
+          peg.n1_values.length > 0
+            ? peg.n1_values.reduce((a, b) => a + b, 0) / peg.n1_values.length
+            : 0;
+        const nAvg =
+          peg.n_values.length > 0
+            ? peg.n_values.reduce((a, b) => a + b, 0) / peg.n_values.length
+            : 0;
 
         // RSD (Relative Standard Deviation) 계산
-        const n1Rsd = peg.n1_values.length > 1 ?
-          Math.sqrt(peg.n1_values.reduce((sum, val) => sum + Math.pow(val - n1Avg, 2), 0) / (peg.n1_values.length - 1)) / Math.abs(n1Avg) * 100 : 0
+        const n1Rsd =
+          peg.n1_values.length > 1
+            ? (Math.sqrt(
+                peg.n1_values.reduce(
+                  (sum, val) => sum + Math.pow(val - n1Avg, 2),
+                  0
+                ) /
+                  (peg.n1_values.length - 1)
+              ) /
+                Math.abs(n1Avg)) *
+              100
+            : 0;
 
-        const nRsd = peg.n_values.length > 1 ?
-          Math.sqrt(peg.n_values.reduce((sum, val) => sum + Math.pow(val - nAvg, 2), 0) / (peg.n_values.length - 1)) / Math.abs(nAvg) * 100 : 0
+        const nRsd =
+          peg.n_values.length > 1
+            ? (Math.sqrt(
+                peg.n_values.reduce(
+                  (sum, val) => sum + Math.pow(val - nAvg, 2),
+                  0
+                ) /
+                  (peg.n_values.length - 1)
+              ) /
+                Math.abs(nAvg)) *
+              100
+            : 0;
 
         // 변화율 계산
-        const changePercent = n1Avg !== 0 ? ((nAvg - n1Avg) / n1Avg) * 100 : 0
-        const trend = changePercent > 5 ? 'up' : changePercent < -5 ? 'down' : 'stable'
+        const changePercent = n1Avg !== 0 ? ((nAvg - n1Avg) / n1Avg) * 100 : 0;
+        const trend =
+          changePercent > 5 ? "up" : changePercent < -5 ? "down" : "stable";
 
         return {
           ...peg,
@@ -726,189 +720,316 @@ const ResultDetail = ({
           n_rsd: nRsd,
           change_percent: changePercent,
           trend,
-          significance: Math.abs(changePercent) > 10 ? 'high' : Math.abs(changePercent) > 5 ? 'medium' : 'low'
-        }
-      })
+          significance:
+            Math.abs(changePercent) > 10
+              ? "high"
+              : Math.abs(changePercent) > 5
+              ? "medium"
+              : "low",
+        };
+      });
 
       // 가중치 기준으로 정렬
-      const sortedResults = comparisonResults.sort((a, b) => (b.weight || 0) - (a.weight || 0))
+      const sortedResults = comparisonResults.sort(
+        (a, b) => (b.weight || 0) - (a.weight || 0)
+      );
 
-      console.log('✅ PEG 비교 결과 계산 완료', sortedResults)
-      return sortedResults
-
+      console.log("✅ PEG 비교 결과 계산 완료", sortedResults);
+      return sortedResults;
     } catch (error) {
-      console.error('❌ PEG 비교 결과 계산 실패', error)
-      return null
+      console.error("❌ PEG 비교 결과 계산 실패", error);
+      return null;
     }
-  }, [])
+  }, []);
 
   // === AbortController 관리 ===
-  const abortControllerRef = useRef(null)
+  const abortControllerRef = useRef(null);
 
   // === 상태 초기화 함수 ===
   const resetAllStates = useCallback(() => {
-    console.log('🔄 모든 상태 초기화 시작')
-    
+    console.log("🔄 모든 상태 초기화 시작");
+
     // 이전 요청이 있으면 취소
     if (abortControllerRef.current) {
-      console.log('⏹️ 이전 요청 취소')
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
+      console.log("⏹️ 이전 요청 취소");
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
-    
-    setResults([])
-    setLoading(false)
-    setError(null)
-    setChoiAlgorithmResult('absent')
-    setMahalanobisResult(null)
-    setPegComparisonResult(null)
-    setPegPage(0)
-    setPegPageSize(10)
-    setPegFilter('')
-    setWeightFilter('all')
-    setTrendFilter('all')
-    setIsFullscreen(false)
-    setHelpModal({ isOpen: false, algorithm: null })
-    console.log('✅ 모든 상태 초기화 완료')
-  }, [])
+
+    setResults([]);
+    setLoading(false);
+    setError(null);
+    setChoiAlgorithmResult("absent");
+    setMahalanobisResult(null);
+    setPegComparisonResult(null);
+    setPegPage(0);
+    setPegPageSize(10);
+    setPegFilter("");
+    setWeightFilter("all");
+    setTrendFilter("all");
+    setIsFullscreen(false);
+    setHelpModal({ isOpen: false, algorithm: null });
+    console.log("✅ 모든 상태 초기화 완료");
+  }, []);
 
   // === Effect: resultIds 변경 시 상태 초기화 및 데이터 로딩 ===
   useEffect(() => {
     if (isOpen && resultIds.length > 0) {
-      console.log('📊 새로운 결과 ID로 전환:', resultIds)
+      console.log("📊 새로운 결과 ID로 전환:", resultIds);
       // 먼저 모든 상태를 초기화
-      resetAllStates()
+      resetAllStates();
       // 그 다음에 새로운 데이터 로딩
-      fetchResultDetails(resultIds)
+      fetchResultDetails(resultIds);
     }
 
     // cleanup 함수: 컴포넌트 언마운트 또는 의존성 변경 시 이전 요청 취소
     return () => {
       if (abortControllerRef.current) {
-        console.log('🧹 useEffect cleanup: 이전 요청 취소')
-        abortControllerRef.current.abort()
-        abortControllerRef.current = null
+        console.log("🧹 useEffect cleanup: 이전 요청 취소");
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
+    };
+  }, [isOpen, resultIds, resetAllStates]);
+
+  // === 마할라노비스 거리 분석 수행 (성능 최적화 및 캐싱) ===
+  const performMahalanobisAnalysis = useCallback(async () => {
+    if (!processedResults.length || !processedResults[0].stats) {
+      console.log("📊 마할라노비스 분석: 데이터가 부족합니다");
+      return;
     }
-  }, [isOpen, resultIds, resetAllStates])
+
+    // 성능 최적화: 동일한 데이터에 대한 중복 분석 방지
+    const resultId = processedResults[0].id;
+    const dataHash = btoa(JSON.stringify(processedResults[0].stats)).slice(
+      0,
+      16
+    );
+
+    if (
+      mahalanobisResult &&
+      mahalanobisResult._cacheKey === `${resultId}-${dataHash}`
+    ) {
+      console.log("⚡ 마할라노비스 분석: 캐시된 결과 사용");
+      return;
+    }
+
+    try {
+      console.log("🧮 마할라노비스 거리 분석 시작");
+
+      // 로딩 상태 표시
+      setMahalanobisResult(null); // 분석 중임을 표시
+
+      // KPI 데이터 추출 (N-1과 N 기간 비교)
+      const kpiData = {};
+      const statsData = processedResults[0].stats || [];
+
+      statsData.forEach((stat) => {
+        const kpiName = stat.kpi_name;
+        if (!kpiData[kpiName]) {
+          kpiData[kpiName] = [];
+        }
+        kpiData[kpiName].push(stat.avg);
+      });
+
+      // 데이터 검증
+      const validKpis = Object.keys(kpiData).filter(
+        (kpiName) => kpiData[kpiName].length >= 2
+      );
+      if (validKpis.length === 0) {
+        throw new Error("분석 가능한 KPI 데이터가 부족합니다.");
+      }
+
+      console.log(`📊 분석할 KPI 수: ${validKpis.length}개`);
+
+      // 마할라노비스 분석 수행
+      const result = await calculateMahalanobisDistance(kpiData);
+
+      // 캐시 키 추가
+      result._cacheKey = `${resultId}-${dataHash}`;
+
+      console.log("✅ 마할라노비스 분석 완료:", result);
+      setMahalanobisResult(result);
+    } catch (error) {
+      console.error("❌ 마할라노비스 분석 실패:", error);
+      setMahalanobisResult({
+        error: error.message || "분석 중 오류가 발생했습니다.",
+        timestamp: new Date().toISOString(),
+        _cacheKey: `${resultId}-${dataHash}`,
+      });
+    }
+  }, [processedResults, calculateMahalanobisDistance, mahalanobisResult]);
+
+  // === PEG 비교 분석 수행 ===
+  const performPegComparisonAnalysis = useCallback(() => {
+    if (!processedResults.length || !processedResults[0].stats) {
+      console.log("📊 PEG 비교 분석: 데이터가 부족합니다");
+      return;
+    }
+
+    try {
+      console.log("📊 PEG 비교 분석 시작");
+      const result = calculatePegComparison(processedResults[0]);
+      console.log("✅ PEG 비교 분석 완료:", result);
+      setPegComparisonResult(result);
+    } catch (error) {
+      console.error("❌ PEG 비교 분석 실패:", error);
+      setPegComparisonResult(null);
+    }
+  }, [processedResults]);
+
+  // === Effect: 데이터 로딩 완료 후 분석 수행 ===
+  useEffect(() => {
+    if (processedResults.length > 0 && !loading) {
+      console.log("🔬 데이터 로딩 완료, 분석 시작");
+
+      // 마할라노비스 분석 수행 (비동기)
+      performMahalanobisAnalysis();
+
+      // PEG 비교 분석 수행 (동기)
+      performPegComparisonAnalysis();
+    }
+  }, [
+    processedResults,
+    loading,
+    performMahalanobisAnalysis,
+    performPegComparisonAnalysis,
+  ]);
 
   // === Effect: 모달이 닫힐 때 상태 정리 ===
   useEffect(() => {
     if (!isOpen) {
-      console.log('🚪 모달이 닫혀서 모든 상태 정리')
-      resetAllStates()
+      console.log("🚪 모달이 닫혀서 모든 상태 정리");
+      resetAllStates();
     }
-  }, [isOpen, resetAllStates])
+  }, [isOpen, resetAllStates]);
 
   // === Effect: 데이터 로딩 완료 후 알고리즘 실행 ===
   useEffect(() => {
-    console.log('🔍 마할라노비스 분석 디버깅:', {
+    console.log("🔍 마할라노비스 분석 디버깅:", {
       resultsLength: results.length,
       loading,
-      processedResults: results.filter(r => !r.error).length
-    })
+      processedResults: results.filter((r) => !r.error).length,
+    });
 
-    const currentProcessedResults = results.filter(r => !r.error)
+    const currentProcessedResults = results.filter((r) => !r.error);
     if (currentProcessedResults.length > 0 && !loading) {
-      const firstResult = currentProcessedResults[0]
-      console.log('📊 첫 번째 결과 데이터 구조:', {
+      const firstResult = currentProcessedResults[0];
+      console.log("📊 첫 번째 결과 데이터 구조:", {
         hasKpiResults: !!firstResult?.kpiResults,
         hasStats: !!firstResult?.stats,
-        kpiResultsKeys: firstResult?.kpiResults ? Object.keys(firstResult.kpiResults) : [],
+        kpiResultsKeys: firstResult?.kpiResults
+          ? Object.keys(firstResult.kpiResults)
+          : [],
         statsLength: firstResult?.stats?.length || 0,
-        fullResult: firstResult
-      })
+        fullResult: firstResult,
+      });
 
       // 마할라노비스 거리 계산
       if (firstResult?.kpiResults || firstResult?.stats) {
-        const mahalanobisData = firstResult.kpiResults || firstResult.stats
-        console.log('🧮 마할라노비스 계산용 데이터:', mahalanobisData)
-        
+        const mahalanobisData = firstResult.kpiResults || firstResult.stats;
+        console.log("🧮 마할라노비스 계산용 데이터:", mahalanobisData);
+
         try {
-          const mahalanobisResult = calculateMahalanobisDistance(mahalanobisData)
-          console.log('✅ 마할라노비스 계산 결과:', mahalanobisResult)
-          setMahalanobisResult(mahalanobisResult)
+          const mahalanobisResult =
+            calculateMahalanobisDistance(mahalanobisData);
+          console.log("✅ 마할라노비스 계산 결과:", mahalanobisResult);
+          setMahalanobisResult(mahalanobisResult);
         } catch (error) {
-          console.error('❌ 마할라노비스 계산 오류:', error)
-          setMahalanobisResult({ error: '계산 중 오류 발생: ' + error.message })
+          console.error("❌ 마할라노비스 계산 오류:", error);
+          setMahalanobisResult({
+            error: "계산 중 오류 발생: " + error.message,
+          });
         }
       } else {
-        console.warn('⚠️ 마할라노비스 계산을 위한 데이터가 없습니다:', {
+        console.warn("⚠️ 마할라노비스 계산을 위한 데이터가 없습니다:", {
           kpiResults: firstResult?.kpiResults,
-          stats: firstResult?.stats
-        })
-        setMahalanobisResult({ error: '분석 데이터가 없습니다' })
+          stats: firstResult?.stats,
+        });
+        setMahalanobisResult({ error: "분석 데이터가 없습니다" });
       }
 
       // PEG 비교 결과 계산
       if (firstResult?.stats) {
-        const pegResult = calculatePegComparison(firstResult)
-        setPegComparisonResult(pegResult)
+        const pegResult = calculatePegComparison(firstResult);
+        setPegComparisonResult(pegResult);
       }
     } else {
-      console.log('⏳ 마할라노비스 분석 대기 중:', {
+      console.log("⏳ 마할라노비스 분석 대기 중:", {
         hasResults: currentProcessedResults.length > 0,
-        isLoading: loading
-      })
+        isLoading: loading,
+      });
     }
-  }, [results, loading, calculateMahalanobisDistance, calculatePegComparison])
+  }, [results, loading, calculateMahalanobisDistance, calculatePegComparison]);
 
   // === 상태별 뱃지 색상 ===
   const getStatusBadgeVariant = (status) => {
     switch (status?.toLowerCase()) {
-      case 'success': return 'default'
-      case 'error': case 'failed': return 'destructive'
-      case 'warning': return 'secondary'
-      case 'pending': case 'processing': return 'outline'
-      default: return 'secondary'
+      case "success":
+        return "default";
+      case "error":
+      case "failed":
+        return "destructive";
+      case "warning":
+        return "secondary";
+      case "pending":
+      case "processing":
+        return "outline";
+      default:
+        return "secondary";
     }
-  }
+  };
 
   // === 날짜 포맷팅 ===
   const formatDate = (dateString) => {
     try {
-      return new Date(dateString).toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        weekday: 'short'
-      })
+      return new Date(dateString).toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        weekday: "short",
+      });
     } catch {
-      return dateString || '-'
+      return dateString || "-";
     }
-  }
+  };
 
   // (모킹 제거)
 
   // === 처리된 결과 데이터 ===
   const processedResults = useMemo(() => {
     // 모킹 제거: 에러가 있는 항목은 제외하고 그대로 사용
-    return results.filter(r => !r.error)
-  }, [results])
+    return results.filter((r) => !r.error);
+  }, [results]);
 
   // === 비교 모드 데이터 처리 ===
   const comparisonData = useMemo(() => {
-    if (!isCompareMode) return null
+    if (!isCompareMode) return null;
 
-    const kpiNames = processedResults[0]?.kpiResults?.map(kpi => kpi.name) || []
-    
-    return kpiNames.map(kpiName => {
-      const dataPoint = { name: kpiName }
-      
+    const kpiNames =
+      processedResults[0]?.kpiResults?.map((kpi) => kpi.name) || [];
+
+    return kpiNames.map((kpiName) => {
+      const dataPoint = { name: kpiName };
+
       processedResults.forEach((result, index) => {
-        const kpi = result.kpiResults?.find(k => k.name === kpiName)
-        dataPoint[`결과${index + 1}`] = parseFloat(kpi?.value || 0)
-      })
-      
-      return dataPoint
-    })
-  }, [processedResults, isCompareMode])
+        const kpi = result.kpiResults?.find((k) => k.name === kpiName);
+        dataPoint[`결과${index + 1}`] = parseFloat(kpi?.value || 0);
+      });
+
+      return dataPoint;
+    });
+  }, [processedResults, isCompareMode]);
 
   // === 단일 결과 차트 데이터 처리 ===
   const kpiChartData = useMemo(() => {
-    if (isCompareMode || !processedResults.length || !processedResults[0].stats) {
+    if (
+      isCompareMode ||
+      !processedResults.length ||
+      !processedResults[0].stats
+    ) {
       return {
         kpiResults: [],
         sortedKpiResults: [],
@@ -918,7 +1039,13 @@ const ResultDetail = ({
         totalPages: 0,
         paginatedResults: [],
         data: [],
-        summaryStats: { improved: 0, declined: 0, stable: 0, avgChange: 0, weightedAvgChange: 0 }
+        summaryStats: {
+          improved: 0,
+          declined: 0,
+          stable: 0,
+          avgChange: 0,
+          weightedAvgChange: 0,
+        },
       };
     }
 
@@ -926,79 +1053,121 @@ const ResultDetail = ({
     const statsData = result.stats || [];
 
     const pegComparison = {};
-    statsData.forEach(stat => {
+    statsData.forEach((stat) => {
       const pegName = stat.kpi_name;
       if (!pegComparison[pegName]) {
         pegComparison[pegName] = { peg_name: pegName, weight: 5 };
       }
-      if (stat.period === 'N-1') {
-        pegComparison[pegName]['N-1'] = stat.avg;
-      } else if (stat.period === 'N') {
-        pegComparison[pegName]['N'] = stat.avg;
+      if (stat.period === "N-1") {
+        pegComparison[pegName]["N-1"] = stat.avg;
+      } else if (stat.period === "N") {
+        pegComparison[pegName]["N"] = stat.avg;
       }
     });
 
     const weightData = result.request_params?.peg_definitions || {};
-    Object.keys(pegComparison).forEach(pegName => {
+    Object.keys(pegComparison).forEach((pegName) => {
       if (weightData[pegName]?.weight) {
         pegComparison[pegName].weight = weightData[pegName].weight;
       }
     });
 
-    const kpiResults = Object.values(pegComparison).filter(peg => peg['N-1'] !== undefined && peg['N'] !== undefined);
-    const sortedKpiResults = [...kpiResults].sort((a, b) => (b.weight || 0) - (a.weight || 0));
+    const kpiResults = Object.values(pegComparison).filter(
+      (peg) => peg["N-1"] !== undefined && peg["N"] !== undefined
+    );
+    const sortedKpiResults = [...kpiResults].sort(
+      (a, b) => (b.weight || 0) - (a.weight || 0)
+    );
 
-    const filteredResults = sortedKpiResults.filter(item => {
-      const matchesNameFilter = !pegFilter || item.peg_name.toLowerCase().includes(pegFilter.toLowerCase());
+    const filteredResults = sortedKpiResults.filter((item) => {
+      const matchesNameFilter =
+        !pegFilter ||
+        item.peg_name.toLowerCase().includes(pegFilter.toLowerCase());
       const weight = item.weight || 0;
       let matchesWeightFilter = true;
-      if (weightFilter === 'high') matchesWeightFilter = weight >= 8;
-      else if (weightFilter === 'medium') matchesWeightFilter = weight >= 6 && weight < 8;
-      else if (weightFilter === 'low') matchesWeightFilter = weight < 6;
+      if (weightFilter === "high") matchesWeightFilter = weight >= 8;
+      else if (weightFilter === "medium")
+        matchesWeightFilter = weight >= 6 && weight < 8;
+      else if (weightFilter === "low") matchesWeightFilter = weight < 6;
       return matchesNameFilter && matchesWeightFilter;
     });
 
-    const dataWithTrends = filteredResults.map(item => {
-      const n1Value = item['N-1'] || 0;
-      const nValue = item['N'] || 0;
+    const dataWithTrends = filteredResults.map((item) => {
+      const n1Value = item["N-1"] || 0;
+      const nValue = item["N"] || 0;
       const change = nValue - n1Value;
       const changePercent = n1Value !== 0 ? (change / n1Value) * 100 : 0;
-      const trend = change > 0 ? 'up' : change < 0 ? 'down' : 'stable';
+      const trend = change > 0 ? "up" : change < 0 ? "down" : "stable";
       return { ...item, change, changePercent, trend };
     });
 
-    const trendFilteredResults = dataWithTrends.filter(item => {
-      if (trendFilter === 'all') return true;
+    const trendFilteredResults = dataWithTrends.filter((item) => {
+      if (trendFilter === "all") return true;
       return item.trend === trendFilter;
     });
 
     const totalPages = Math.ceil(trendFilteredResults.length / pegPageSize);
-    const paginatedResults = trendFilteredResults.slice(pegPage * pegPageSize, (pegPage + 1) * pegPageSize);
+    const paginatedResults = trendFilteredResults.slice(
+      pegPage * pegPageSize,
+      (pegPage + 1) * pegPageSize
+    );
 
-    const data = paginatedResults.map(item => ({
+    const data = paginatedResults.map((item) => ({
       name: item.peg_name,
-      'N-1': item['N-1'] || 0,
-      'N': item['N'] || 0,
+      "N-1": item["N-1"] || 0,
+      N: item["N"] || 0,
       change: item.change,
       changePercent: item.changePercent,
       trend: item.trend,
       weight: item.weight,
-      unit: '%',
-      peg: item.weight || 0
+      unit: "%",
+      peg: item.weight || 0,
     }));
 
-    const improved = data.filter(item => item.trend === 'up').length;
-    const declined = data.filter(item => item.trend === 'down').length;
-    const stable = data.filter(item => item.trend === 'stable').length;
-    const avgChange = data.length > 0 ? data.reduce((sum, item) => sum + item.change, 0) / data.length : 0;
-    const weightedAvgChange = data.length > 0 ? data.reduce((sum, item) => sum + (item.change * item.weight), 0) / data.reduce((sum, item) => sum + item.weight, 0) : 0;
-    const summaryStats = { improved, declined, stable, avgChange, weightedAvgChange };
+    const improved = data.filter((item) => item.trend === "up").length;
+    const declined = data.filter((item) => item.trend === "down").length;
+    const stable = data.filter((item) => item.trend === "stable").length;
+    const avgChange =
+      data.length > 0
+        ? data.reduce((sum, item) => sum + item.change, 0) / data.length
+        : 0;
+    const weightedAvgChange =
+      data.length > 0
+        ? data.reduce((sum, item) => sum + item.change * item.weight, 0) /
+          data.reduce((sum, item) => sum + item.weight, 0)
+        : 0;
+    const summaryStats = {
+      improved,
+      declined,
+      stable,
+      avgChange,
+      weightedAvgChange,
+    };
 
-    return { kpiResults, sortedKpiResults, filteredResults, dataWithTrends, trendFilteredResults, totalPages, paginatedResults, data, summaryStats };
-  }, [isCompareMode, processedResults, pegFilter, weightFilter, trendFilter, pegPage, pegPageSize]);
+    return {
+      kpiResults,
+      sortedKpiResults,
+      filteredResults,
+      dataWithTrends,
+      trendFilteredResults,
+      totalPages,
+      paginatedResults,
+      data,
+      summaryStats,
+    };
+  }, [
+    isCompareMode,
+    processedResults,
+    pegFilter,
+    weightFilter,
+    trendFilter,
+    pegPage,
+    pegPageSize,
+  ]);
 
   const renderKpiChart = () => {
-    const { kpiResults, trendFilteredResults, totalPages, data, summaryStats } = kpiChartData;
+    const { kpiResults, trendFilteredResults, totalPages, data, summaryStats } =
+      kpiChartData;
 
     if (isCompareMode) {
       return (
@@ -1010,19 +1179,23 @@ const ResultDetail = ({
             <Tooltip />
             <Legend />
             {processedResults.map((_, index) => (
-              <Bar 
-                key={`result${index + 1}`} 
-                dataKey={`결과${index + 1}`} 
-                fill={`hsl(${index * 60}, 70%, 50%)`} 
+              <Bar
+                key={`result${index + 1}`}
+                dataKey={`결과${index + 1}`}
+                fill={`hsl(${index * 60}, 70%, 50%)`}
               />
             ))}
           </BarChart>
         </ResponsiveContainer>
-      )
+      );
     }
 
     if (!kpiResults.length) {
-      return <div className="text-center text-muted-foreground">PEG 비교 데이터가 없습니다.</div>
+      return (
+        <div className="text-center text-muted-foreground">
+          PEG 비교 데이터가 없습니다.
+        </div>
+      );
     }
 
     return (
@@ -1030,26 +1203,44 @@ const ResultDetail = ({
         {/* 성능 요약 통계 */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 bg-muted/30 rounded-lg">
           <div className="text-center">
-            <div className="text-lg font-bold text-green-600">{summaryStats.improved}</div>
+            <div className="text-lg font-bold text-green-600">
+              {summaryStats.improved}
+            </div>
             <div className="text-xs text-muted-foreground">개선 📈</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-red-600">{summaryStats.declined}</div>
+            <div className="text-lg font-bold text-red-600">
+              {summaryStats.declined}
+            </div>
             <div className="text-xs text-muted-foreground">하락 📉</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-gray-600">{summaryStats.stable}</div>
+            <div className="text-lg font-bold text-gray-600">
+              {summaryStats.stable}
+            </div>
             <div className="text-xs text-muted-foreground">안정 ➡️</div>
           </div>
           <div className="text-center">
-            <div className={`text-lg font-bold ${summaryStats.avgChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {summaryStats.avgChange > 0 ? '+' : ''}{summaryStats.avgChange.toFixed(2)}%
+            <div
+              className={`text-lg font-bold ${
+                summaryStats.avgChange >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {summaryStats.avgChange > 0 ? "+" : ""}
+              {summaryStats.avgChange.toFixed(2)}%
             </div>
             <div className="text-xs text-muted-foreground">평균 변화</div>
           </div>
           <div className="text-center">
-            <div className={`text-lg font-bold ${summaryStats.weightedAvgChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {summaryStats.weightedAvgChange > 0 ? '+' : ''}{summaryStats.weightedAvgChange.toFixed(2)}%
+            <div
+              className={`text-lg font-bold ${
+                summaryStats.weightedAvgChange >= 0
+                  ? "text-green-600"
+                  : "text-red-600"
+              }`}
+            >
+              {summaryStats.weightedAvgChange > 0 ? "+" : ""}
+              {summaryStats.weightedAvgChange.toFixed(2)}%
             </div>
             <div className="text-xs text-muted-foreground">가중 평균 변화</div>
           </div>
@@ -1063,10 +1254,14 @@ const ResultDetail = ({
               전체 {kpiResults.length}개 중 {trendFilteredResults.length}개 표시
             </Badge>
           </div>
-          
-          <div className={`grid gap-3 transition-all duration-300 ${
-            isFullscreen ? 'grid-cols-1 md:grid-cols-6 lg:grid-cols-8' : 'grid-cols-1 md:grid-cols-5'
-          }`}>
+
+          <div
+            className={`grid gap-3 transition-all duration-300 ${
+              isFullscreen
+                ? "grid-cols-1 md:grid-cols-6 lg:grid-cols-8"
+                : "grid-cols-1 md:grid-cols-5"
+            }`}
+          >
             {/* PEG 이름 검색 */}
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1074,18 +1269,21 @@ const ResultDetail = ({
                 placeholder="PEG 이름 검색..."
                 value={pegFilter}
                 onChange={(e) => {
-                  setPegFilter(e.target.value)
-                  setPegPage(0) // 검색 시 첫 페이지로
+                  setPegFilter(e.target.value);
+                  setPegPage(0); // 검색 시 첫 페이지로
                 }}
                 className="pl-8"
               />
             </div>
-            
+
             {/* 가중치 필터 */}
-            <Select value={weightFilter} onValueChange={(value) => {
-              setWeightFilter(value)
-              setPegPage(0) // 필터 변경 시 첫 페이지로
-            }}>
+            <Select
+              value={weightFilter}
+              onValueChange={(value) => {
+                setWeightFilter(value);
+                setPegPage(0); // 필터 변경 시 첫 페이지로
+              }}
+            >
               <SelectTrigger>
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="가중치 필터" />
@@ -1097,12 +1295,15 @@ const ResultDetail = ({
                 <SelectItem value="low">낮음 (&lt;6)</SelectItem>
               </SelectContent>
             </Select>
-            
+
             {/* 트렌드 필터 */}
-            <Select value={trendFilter} onValueChange={(value) => {
-              setTrendFilter(value)
-              setPegPage(0) // 필터 변경 시 첫 페이지로
-            }}>
+            <Select
+              value={trendFilter}
+              onValueChange={(value) => {
+                setTrendFilter(value);
+                setPegPage(0); // 필터 변경 시 첫 페이지로
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="트렌드 필터" />
               </SelectTrigger>
@@ -1113,12 +1314,15 @@ const ResultDetail = ({
                 <SelectItem value="stable">안정 ➡️</SelectItem>
               </SelectContent>
             </Select>
-            
+
             {/* 페이지 크기 선택 */}
-            <Select value={pegPageSize.toString()} onValueChange={(value) => {
-              setPegPageSize(parseInt(value))
-              setPegPage(0) // 페이지 크기 변경 시 첫 페이지로
-            }}>
+            <Select
+              value={pegPageSize.toString()}
+              onValueChange={(value) => {
+                setPegPageSize(parseInt(value));
+                setPegPage(0); // 페이지 크기 변경 시 첫 페이지로
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="표시 개수" />
               </SelectTrigger>
@@ -1129,7 +1333,7 @@ const ResultDetail = ({
                 <SelectItem value="50">50개씩</SelectItem>
               </SelectContent>
             </Select>
-            
+
             {/* 페이지네이션 */}
             <div className="flex items-center justify-center gap-2">
               <Button
@@ -1146,7 +1350,9 @@ const ResultDetail = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPegPage(Math.min(totalPages - 1, pegPage + 1))}
+                onClick={() =>
+                  setPegPage(Math.min(totalPages - 1, pegPage + 1))
+                }
                 disabled={pegPage >= totalPages - 1}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -1154,18 +1360,22 @@ const ResultDetail = ({
             </div>
           </div>
         </div>
-        <ResponsiveContainer 
-          width="100%" 
-          height={isFullscreen ? Math.min(window.innerHeight * 0.55, 900) : Math.min(window.innerHeight * 0.4, 500)}
+        <ResponsiveContainer
+          width="100%"
+          height={
+            isFullscreen
+              ? Math.min(window.innerHeight * 0.55, 900)
+              : Math.min(window.innerHeight * 0.4, 500)
+          }
           className="transition-all duration-300"
         >
-          <BarChart 
-            data={data} 
+          <BarChart
+            data={data}
             margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="name" 
+            <XAxis
+              dataKey="name"
               angle={-45}
               textAnchor="end"
               height={100}
@@ -1173,56 +1383,76 @@ const ResultDetail = ({
               fontSize={10}
             />
             <YAxis />
-            <Tooltip 
+            <Tooltip
               formatter={(value, name, props) => [
                 `${value?.toFixed(2)} ${props.payload.unit}`,
-                name
+                name,
               ]}
               labelFormatter={(label) => {
-                const item = data.find(d => d.name === label)
-                return `${label} (가중치: ${item?.weight || 0})`
+                const item = data.find((d) => d.name === label);
+                return `${label} (가중치: ${item?.weight || 0})`;
               }}
               content={({ active, payload, label }) => {
-                if (!active || !payload?.length) return null
-                
-                const data = payload[0]?.payload
-                if (!data) return null
-                
+                if (!active || !payload?.length) return null;
+
+                const data = payload[0]?.payload;
+                if (!data) return null;
+
                 const getTrendIcon = (trend) => {
-                  switch(trend) {
-                    case 'up': return '📈'
-                    case 'down': return '📉'
-                    default: return '➡️'
+                  switch (trend) {
+                    case "up":
+                      return "📈";
+                    case "down":
+                      return "📉";
+                    default:
+                      return "➡️";
                   }
-                }
-                
+                };
+
                 const getTrendColor = (trend) => {
-                  switch(trend) {
-                    case 'up': return 'text-green-600'
-                    case 'down': return 'text-red-600'
-                    default: return 'text-gray-600'
+                  switch (trend) {
+                    case "up":
+                      return "text-green-600";
+                    case "down":
+                      return "text-red-600";
+                    default:
+                      return "text-gray-600";
                   }
-                }
-                
+                };
+
                 return (
                   <div className="bg-white border rounded-lg shadow-lg p-3 min-w-[200px]">
                     <div className="font-semibold mb-2">{label}</div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
                         <span className="text-orange-600">N-1 기간:</span>
-                        <span className="font-medium">{data['N-1']?.toFixed(2)}%</span>
+                        <span className="font-medium">
+                          {data["N-1"]?.toFixed(2)}%
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-blue-600">N 기간:</span>
-                        <span className="font-medium">{data['N']?.toFixed(2)}%</span>
+                        <span className="font-medium">
+                          {data["N"]?.toFixed(2)}%
+                        </span>
                       </div>
                       <div className="border-t pt-1 mt-2">
                         <div className="flex justify-between items-center">
                           <span className="text-gray-600">성능 변화:</span>
-                          <div className={`flex items-center gap-1 font-medium ${getTrendColor(data.trend)}`}>
+                          <div
+                            className={`flex items-center gap-1 font-medium ${getTrendColor(
+                              data.trend
+                            )}`}
+                          >
                             <span>{getTrendIcon(data.trend)}</span>
-                            <span>{data.change > 0 ? '+' : ''}{data.change?.toFixed(2)}%</span>
-                            <span className="text-xs">({data.changePercent > 0 ? '+' : ''}{data.changePercent?.toFixed(1)}%)</span>
+                            <span>
+                              {data.change > 0 ? "+" : ""}
+                              {data.change?.toFixed(2)}%
+                            </span>
+                            <span className="text-xs">
+                              ({data.changePercent > 0 ? "+" : ""}
+                              {data.changePercent?.toFixed(1)}%)
+                            </span>
                           </div>
                         </div>
                         <div className="flex justify-between mt-1">
@@ -1232,7 +1462,7 @@ const ResultDetail = ({
                       </div>
                     </div>
                   </div>
-                )
+                );
               }}
             />
             <Legend />
@@ -1241,8 +1471,8 @@ const ResultDetail = ({
           </BarChart>
         </ResponsiveContainer>
       </div>
-    )
-  }
+    );
+  };
 
   // === LLM 데이터 구조 분석 헬퍼 함수들 ===
 
@@ -1255,232 +1485,263 @@ const ResultDetail = ({
       dataKeys: data ? Object.keys(data) : [],
       nestedDataKeys: data?.data ? Object.keys(data.data) : [],
       doubleNestedKeys: data?.data?.data ? Object.keys(data.data.data) : [],
-      structureType: 'unknown',
-      recommendedPath: ''
-    }
+      structureType: "unknown",
+      recommendedPath: "",
+    };
 
     // 구조 타입 판정 및 추천 경로 설정
     if (data?.data?.data?.analysis) {
-      analysis.structureType = 'triple_nested'
-      analysis.recommendedPath = 'data.data.analysis'
+      analysis.structureType = "triple_nested";
+      analysis.recommendedPath = "data.data.analysis";
     } else if (data?.data?.analysis) {
-      analysis.structureType = 'double_nested'
-      analysis.recommendedPath = 'data.analysis'
+      analysis.structureType = "double_nested";
+      analysis.recommendedPath = "data.analysis";
     } else if (data?.analysis) {
-      analysis.structureType = 'single_level'
-      analysis.recommendedPath = 'analysis'
+      analysis.structureType = "single_level";
+      analysis.recommendedPath = "analysis";
     }
 
-    return analysis
-  }
+    return analysis;
+  };
 
   // 우선순위 기반 분석 데이터 추출 (개선된 다중 폴백)
   const extractAnalysisData = (data) => {
-    let doc, analysis, dataStructure
+    let doc, analysis, dataStructure;
 
     // 우선순위 1: Backend 표준 구조 (data.analysis) - LLM 결과가 analysis 필드에 저장됨
-    if (data?.data?.analysis && typeof data.data.analysis === 'object' && !Array.isArray(data.data.analysis)) {
-      doc = data.data
-      analysis = doc.analysis
-      dataStructure = 'data.analysis (Backend 표준 구조 - LLM 결과 위치)'
-      console.log('✅ 우선순위 1: data.analysis 구조 사용 (Backend 표준 - LLM 결과 위치)')
+    if (
+      data?.data?.analysis &&
+      typeof data.data.analysis === "object" &&
+      !Array.isArray(data.data.analysis)
+    ) {
+      doc = data.data;
+      analysis = doc.analysis;
+      dataStructure = "data.analysis (Backend 표준 구조 - LLM 결과 위치)";
+      console.log(
+        "✅ 우선순위 1: data.analysis 구조 사용 (Backend 표준 - LLM 결과 위치)"
+      );
     }
     // 우선순위 2: Backend 표준 구조 (data) - data 필드가 직접 LLM 결과인 경우
-    else if (data?.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+    else if (
+      data?.data &&
+      typeof data.data === "object" &&
+      !Array.isArray(data.data)
+    ) {
       // data 필드에 LLM 분석 결과가 직접 있는지 확인
-      const hasLLMFields = data.data.executive_summary !== undefined || 
-                          data.data.overall_summary !== undefined || 
-                          data.data.comprehensive_summary !== undefined ||
-                          data.data.diagnostic_findings !== undefined
-      
+      const hasLLMFields =
+        data.data.executive_summary !== undefined ||
+        data.data.overall_summary !== undefined ||
+        data.data.comprehensive_summary !== undefined ||
+        data.data.diagnostic_findings !== undefined;
+
       if (hasLLMFields) {
-        doc = data
-        analysis = doc.data
-        dataStructure = 'data (Backend 표준 구조 - LLM 결과 직접 위치)'
-        console.log('✅ 우선순위 2: data 구조 사용 (Backend 표준 - LLM 결과 직접 위치)')
+        doc = data;
+        analysis = doc.data;
+        dataStructure = "data (Backend 표준 구조 - LLM 결과 직접 위치)";
+        console.log(
+          "✅ 우선순위 2: data 구조 사용 (Backend 표준 - LLM 결과 직접 위치)"
+        );
       } else {
         // LLM 필드가 없으면 다음 우선순위로
-        doc = data
-        analysis = {}
-        dataStructure = 'data (LLM 필드 없음)'
-        console.log('⚠️ data 구조에 LLM 필드가 없습니다')
+        doc = data;
+        analysis = {};
+        dataStructure = "data (LLM 필드 없음)";
+        console.log("⚠️ data 구조에 LLM 필드가 없습니다");
       }
     }
     // 우선순위 3: 기존 중첩 구조 (first.data.data.analysis) - 호환성 유지
     else if (data?.data?.data?.analysis) {
-      doc = data.data.data
-      analysis = doc.analysis
-      dataStructure = 'data.data.analysis (기존 중첩 구조)'
-      console.log('⚠️ 우선순위 3: data.data.analysis 구조 사용 (중첩 구조)')
+      doc = data.data.data;
+      analysis = doc.analysis;
+      dataStructure = "data.data.analysis (기존 중첩 구조)";
+      console.log("⚠️ 우선순위 3: data.data.analysis 구조 사용 (중첩 구조)");
     }
     // 우선순위 4: 직접 구조 (first.analysis) - 폴백
     else if (data?.analysis) {
-      doc = data
-      analysis = doc.analysis
-      dataStructure = 'analysis (직접 구조)'
-      console.log('📋 우선순위 4: analysis 직접 구조 사용')
+      doc = data;
+      analysis = doc.analysis;
+      dataStructure = "analysis (직접 구조)";
+      console.log("📋 우선순위 4: analysis 직접 구조 사용");
     }
     // 우선순위 5: 기본값
     else {
-      doc = data || {}
-      analysis = {}
-      dataStructure = 'empty (데이터 없음)'
-      console.warn('❌ 모든 우선순위 실패: 분석 데이터를 찾을 수 없습니다')
+      doc = data || {};
+      analysis = {};
+      dataStructure = "empty (데이터 없음)";
+      console.warn("❌ 모든 우선순위 실패: 분석 데이터를 찾을 수 없습니다");
     }
 
-    return { doc, analysis, dataStructure }
-  }
+    return { doc, analysis, dataStructure };
+  };
 
   // 데이터 검증 함수 (타입 안전성 강화)
   const validateAnalysisData = (analysis) => {
     const validation = {
       isValid: false,
       errors: [],
-      warnings: []
-    }
+      warnings: [],
+    };
 
     if (!analysis) {
-      validation.errors.push('analysis 객체가 없습니다')
-      return validation
+      validation.errors.push("analysis 객체가 없습니다");
+      return validation;
     }
 
-    if (typeof analysis !== 'object') {
-      validation.errors.push('analysis가 객체 타입이 아닙니다')
-      return validation
+    if (typeof analysis !== "object") {
+      validation.errors.push("analysis가 객체 타입이 아닙니다");
+      return validation;
     }
 
     // executive_summary 검증
     if (analysis.executive_summary !== undefined) {
-      if (typeof analysis.executive_summary === 'string') {
-        validation.isValid = true
+      if (typeof analysis.executive_summary === "string") {
+        validation.isValid = true;
       } else {
-        validation.warnings.push('executive_summary가 문자열 타입이 아닙니다')
+        validation.warnings.push("executive_summary가 문자열 타입이 아닙니다");
       }
     }
 
     // 다른 요약 필드들도 검증
-    const summaryFields = ['overall_summary', 'comprehensive_summary']
-    summaryFields.forEach(field => {
-      if (analysis[field] !== undefined && typeof analysis[field] !== 'string') {
-        validation.warnings.push(`${field}가 문자열 타입이 아닙니다`)
+    const summaryFields = ["overall_summary", "comprehensive_summary"];
+    summaryFields.forEach((field) => {
+      if (
+        analysis[field] !== undefined &&
+        typeof analysis[field] !== "string"
+      ) {
+        validation.warnings.push(`${field}가 문자열 타입이 아닙니다`);
       }
-    })
+    });
 
     // 필수 필드 존재 확인
-    const requiredFields = ['diagnostic_findings', 'recommended_actions']
-    requiredFields.forEach(field => {
+    const requiredFields = ["diagnostic_findings", "recommended_actions"];
+    requiredFields.forEach((field) => {
       if (analysis[field] === undefined) {
-        validation.warnings.push(`선택적 필드 ${field}가 없습니다`)
+        validation.warnings.push(`선택적 필드 ${field}가 없습니다`);
       }
-    })
+    });
 
     if (validation.errors.length === 0) {
-      validation.isValid = true
+      validation.isValid = true;
     }
 
-    return validation
-  }
+    return validation;
+  };
 
   // 개선된 요약 텍스트 추출 (우선순위 기반 + 유연한 필드 탐색)
   const extractSummaryText = (analysis) => {
-    let summaryText = '요약 정보가 없습니다.'
-    let selectedField = 'none'
+    let summaryText = "요약 정보가 없습니다.";
+    let selectedField = "none";
 
     if (!analysis) {
-      return { summaryText, selectedField }
+      return { summaryText, selectedField };
     }
 
     // 우선순위 1: 표준 LLM 분석 요약 필드들
     const priorityFields = [
-      'executive_summary',     // 경영진 요약
-      'overall_summary',       // 전체 요약
-      'comprehensive_summary', // 종합 요약
-      'summary',              // 일반 요약
-      'conclusion',           // 결론
-      'result',               // 결과
-      'description',          // 설명
-      'analysis_summary',     // 분석 요약
-      'key_findings',         // 주요 발견사항 (문자열인 경우)
-      'recommendations',      // 권장사항 (문자열인 경우)
-      'insights',             // 통찰
-      'overview'              // 개요
-    ]
+      "executive_summary", // 경영진 요약
+      "overall_summary", // 전체 요약
+      "comprehensive_summary", // 종합 요약
+      "summary", // 일반 요약
+      "conclusion", // 결론
+      "result", // 결과
+      "description", // 설명
+      "analysis_summary", // 분석 요약
+      "key_findings", // 주요 발견사항 (문자열인 경우)
+      "recommendations", // 권장사항 (문자열인 경우)
+      "insights", // 통찰
+      "overview", // 개요
+    ];
 
     // 우선순위 필드들을 순차적으로 탐색
     for (const field of priorityFields) {
-      const value = analysis[field]
+      const value = analysis[field];
 
       if (value) {
         // 문자열인 경우 직접 사용
-        if (typeof value === 'string' && value.trim()) {
-          summaryText = value.trim()
-          selectedField = field
-          console.log(`✅ ${field} 필드 사용 (문자열)`)
-          break
+        if (typeof value === "string" && value.trim()) {
+          summaryText = value.trim();
+          selectedField = field;
+          console.log(`✅ ${field} 필드 사용 (문자열)`);
+          break;
         }
         // 배열인 경우 첫 번째 요소가 문자열이면 사용
         else if (Array.isArray(value) && value.length > 0) {
-          const firstItem = value[0]
-          if (typeof firstItem === 'string' && firstItem.trim()) {
-            summaryText = firstItem.trim()
-            selectedField = `${field}[0]`
-            console.log(`📝 ${field} 배열의 첫 번째 요소 사용`)
-            break
+          const firstItem = value[0];
+          if (typeof firstItem === "string" && firstItem.trim()) {
+            summaryText = firstItem.trim();
+            selectedField = `${field}[0]`;
+            console.log(`📝 ${field} 배열의 첫 번째 요소 사용`);
+            break;
           }
           // 객체 배열인 경우 특정 필드 탐색
-          else if (typeof firstItem === 'object' && firstItem) {
-            const textFields = ['text', 'content', 'summary', 'description', 'message']
+          else if (typeof firstItem === "object" && firstItem) {
+            const textFields = [
+              "text",
+              "content",
+              "summary",
+              "description",
+              "message",
+            ];
             for (const textField of textFields) {
-              if (firstItem[textField] && typeof firstItem[textField] === 'string') {
-                summaryText = firstItem[textField].trim()
-                selectedField = `${field}[0].${textField}`
-                console.log(`📝 ${field}[0].${textField} 필드 사용`)
-                break
+              if (
+                firstItem[textField] &&
+                typeof firstItem[textField] === "string"
+              ) {
+                summaryText = firstItem[textField].trim();
+                selectedField = `${field}[0].${textField}`;
+                console.log(`📝 ${field}[0].${textField} 필드 사용`);
+                break;
               }
             }
-            if (selectedField !== 'none') break
+            if (selectedField !== "none") break;
           }
         }
         // 객체인 경우 특정 필드 탐색
-        else if (typeof value === 'object') {
-          const textFields = ['text', 'content', 'summary', 'description', 'message']
+        else if (typeof value === "object") {
+          const textFields = [
+            "text",
+            "content",
+            "summary",
+            "description",
+            "message",
+          ];
           for (const textField of textFields) {
-            if (value[textField] && typeof value[textField] === 'string') {
-              summaryText = value[textField].trim()
-              selectedField = `${field}.${textField}`
-              console.log(`📝 ${field}.${textField} 필드 사용`)
-              break
+            if (value[textField] && typeof value[textField] === "string") {
+              summaryText = value[textField].trim();
+              selectedField = `${field}.${textField}`;
+              console.log(`📝 ${field}.${textField} 필드 사용`);
+              break;
             }
           }
-          if (selectedField !== 'none') break
+          if (selectedField !== "none") break;
         }
       }
     }
 
     // 모든 필드 탐색에도 실패한 경우
-    if (selectedField === 'none') {
-      console.warn('⚠️ 모든 요약 필드가 비어있거나 유효하지 않습니다')
-      console.log('🔍 사용 가능한 필드들:', Object.keys(analysis))
+    if (selectedField === "none") {
+      console.warn("⚠️ 모든 요약 필드가 비어있거나 유효하지 않습니다");
+      console.log("🔍 사용 가능한 필드들:", Object.keys(analysis));
     }
 
-    return { summaryText, selectedField }
-  }
+    return { summaryText, selectedField };
+  };
 
   // === LLM 분석 리포트 렌더링 (개선된 데이터 구조 처리) ===
   const renderLLMReport = (results) => {
-    const first = results?.[0] || {}
+    const first = results?.[0] || {};
 
     // 강화된 디버깅: 데이터 구조 자동 분석
-    const dataStructureAnalysis = analyzeLLMDataStructure(first)
-    console.log('🔍 LLM 분석 결과 디버깅:', dataStructureAnalysis)
+    const dataStructureAnalysis = analyzeLLMDataStructure(first);
+    console.log("🔍 LLM 분석 결과 디버깅:", dataStructureAnalysis);
 
     // 개선된 분석 객체 추출: 우선순위 기반 다중 폴백
-    const { doc, analysis, dataStructure } = extractAnalysisData(first)
+    const { doc, analysis, dataStructure } = extractAnalysisData(first);
 
     // 타입 안전성 강화: 데이터 검증
-    const validationResult = validateAnalysisData(analysis)
+    const validationResult = validateAnalysisData(analysis);
 
-    console.log('📊 분석 객체 구조:', {
+    console.log("📊 분석 객체 구조:", {
       analysis,
       analysisKeys: Object.keys(analysis || {}),
       dataStructure,
@@ -1488,97 +1749,112 @@ const ResultDetail = ({
       availableSummaries: {
         executive_summary: !!analysis?.executive_summary,
         overall_summary: !!analysis?.overall_summary,
-        comprehensive_summary: !!analysis?.comprehensive_summary
+        comprehensive_summary: !!analysis?.comprehensive_summary,
       },
       // 추가 디버깅: 원본 데이터 구조 확인
       originalDataKeys: Object.keys(first || {}),
-      hasDataField: 'data' in (first || {}),
+      hasDataField: "data" in (first || {}),
       dataFieldKeys: first?.data ? Object.keys(first.data) : [],
       hasAnalysisInData: first?.data?.analysis !== undefined,
-      analysisInDataKeys: first?.data?.analysis ? Object.keys(first.data.analysis) : [],
+      analysisInDataKeys: first?.data?.analysis
+        ? Object.keys(first.data.analysis)
+        : [],
       // LLM 필드 존재 여부 상세 확인
       llmFieldsCheck: {
         executive_summary: {
           exists: analysis?.executive_summary !== undefined,
           type: typeof analysis?.executive_summary,
-          value: analysis?.executive_summary
+          value: analysis?.executive_summary,
         },
         overall_summary: {
           exists: analysis?.overall_summary !== undefined,
           type: typeof analysis?.overall_summary,
-          value: analysis?.overall_summary
+          value: analysis?.overall_summary,
         },
         comprehensive_summary: {
           exists: analysis?.comprehensive_summary !== undefined,
           type: typeof analysis?.comprehensive_summary,
-          value: analysis?.comprehensive_summary
-        }
-      }
-    })
+          value: analysis?.comprehensive_summary,
+        },
+      },
+    });
 
     // 개선된 요약 텍스트 추출: 우선순위 기반
-    const { summaryText, selectedField } = extractSummaryText(analysis)
+    const { summaryText, selectedField } = extractSummaryText(analysis);
 
-    console.log('📝 최종 요약 텍스트:', {
-      summaryText: summaryText?.substring(0, 200) + '...' || '없음',
+    console.log("📝 최종 요약 텍스트:", {
+      summaryText: summaryText?.substring(0, 200) + "..." || "없음",
       selectedField,
       textLength: summaryText?.length || 0,
-      isValid: !!summaryText && summaryText !== '요약 정보가 없습니다.'
-    })
+      isValid: !!summaryText && summaryText !== "요약 정보가 없습니다.",
+    });
 
     // 진단 결과: 다중 필드 지원으로 유연한 탐색
     const extractDiagnosticFindings = (analysis) => {
       // 우선순위: diagnostic_findings -> key_findings -> findings -> observations
-      const possibleFields = ['diagnostic_findings', 'key_findings', 'findings', 'observations', 'insights']
+      const possibleFields = [
+        "diagnostic_findings",
+        "key_findings",
+        "findings",
+        "observations",
+        "insights",
+      ];
 
       for (const field of possibleFields) {
-        const value = analysis[field]
+        const value = analysis[field];
         if (Array.isArray(value) && value.length > 0) {
           // 이미 객체 배열인 경우
-          if (typeof value[0] === 'object' && value[0]) {
-            return value
+          if (typeof value[0] === "object" && value[0]) {
+            return value;
           }
           // 문자열 배열인 경우 객체로 변환
-          else if (typeof value[0] === 'string') {
-            return value.map(item => ({ primary_hypothesis: String(item) }))
+          else if (typeof value[0] === "string") {
+            return value.map((item) => ({ primary_hypothesis: String(item) }));
           }
         }
       }
-      return []
-    }
+      return [];
+    };
 
-    const diagnosticFindings = extractDiagnosticFindings(analysis)
+    const diagnosticFindings = extractDiagnosticFindings(analysis);
 
     // 권장 조치: 다중 필드 지원으로 유연한 탐색
     const extractRecommendedActions = (analysis) => {
       // 우선순위: recommended_actions -> recommendations -> actions -> suggestions
-      const possibleFields = ['recommended_actions', 'recommendations', 'actions', 'suggestions']
+      const possibleFields = [
+        "recommended_actions",
+        "recommendations",
+        "actions",
+        "suggestions",
+      ];
 
       for (const field of possibleFields) {
-        const value = analysis[field]
+        const value = analysis[field];
         if (Array.isArray(value) && value.length > 0) {
           return value.map((a) => {
-            if (a && typeof a === 'object') return a
-            return { priority: '', action: String(a || ''), details: '' }
-          })
+            if (a && typeof a === "object") return a;
+            return { priority: "", action: String(a || ""), details: "" };
+          });
         }
         // 단일 객체인 경우 배열로 변환
-        else if (value && typeof value === 'object') {
-          return [{
-            priority: value.priority || '',
-            action: value.action || String(value),
-            details: value.details || ''
-          }]
+        else if (value && typeof value === "object") {
+          return [
+            {
+              priority: value.priority || "",
+              action: value.action || String(value),
+              details: value.details || "",
+            },
+          ];
         }
         // 문자열인 경우 객체로 변환
-        else if (typeof value === 'string' && value.trim()) {
-          return [{ priority: '', action: value.trim(), details: '' }]
+        else if (typeof value === "string" && value.trim()) {
+          return [{ priority: "", action: value.trim(), details: "" }];
         }
       }
-      return []
-    }
+      return [];
+    };
 
-    const recommendedActions = extractRecommendedActions(analysis)
+    const recommendedActions = extractRecommendedActions(analysis);
 
     return (
       <div className="space-y-4 max-w-full overflow-hidden">
@@ -1605,13 +1881,20 @@ const ResultDetail = ({
                 {diagnosticFindings.map((d, idx) => (
                   <div key={idx} className="space-y-1">
                     {d.primary_hypothesis && (
-                      <div className="text-sm break-words whitespace-pre-wrap"><span className="font-semibold">가설 {idx + 1}:</span> {d.primary_hypothesis}</div>
+                      <div className="text-sm break-words whitespace-pre-wrap">
+                        <span className="font-semibold">가설 {idx + 1}:</span>{" "}
+                        {d.primary_hypothesis}
+                      </div>
                     )}
                     {d.supporting_evidence && (
-                      <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap">증거: {d.supporting_evidence}</div>
+                      <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap">
+                        증거: {d.supporting_evidence}
+                      </div>
                     )}
                     {d.confounding_factors_assessment && (
-                      <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap">교란 변수 평가: {d.confounding_factors_assessment}</div>
+                      <div className="text-xs text-muted-foreground break-words whitespace-pre-wrap">
+                        교란 변수 평가: {d.confounding_factors_assessment}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1629,17 +1912,28 @@ const ResultDetail = ({
             <CardContent className="max-w-full overflow-hidden">
               <div className="space-y-3 max-w-full overflow-hidden">
                 {recommendedActions.map((a, idx) => (
-                  <div key={idx} className="flex items-start gap-3 max-w-full overflow-hidden">
+                  <div
+                    key={idx}
+                    className="flex items-start gap-3 max-w-full overflow-hidden"
+                  >
                     <div className="mt-0.5 flex-shrink-0">
                       <CheckCircle className="h-5 w-5 text-green-500" />
                     </div>
                     <div className="flex-1 min-w-0 max-w-full overflow-hidden">
                       <div className="flex items-center gap-2 max-w-full overflow-hidden">
-                        {a.priority && <Badge variant="outline" className="flex-shrink-0">{a.priority}</Badge>}
-                        <div className="text-sm font-medium break-words whitespace-pre-wrap min-w-0 max-w-full">{a.action || '-'}</div>
+                        {a.priority && (
+                          <Badge variant="outline" className="flex-shrink-0">
+                            {a.priority}
+                          </Badge>
+                        )}
+                        <div className="text-sm font-medium break-words whitespace-pre-wrap min-w-0 max-w-full">
+                          {a.action || "-"}
+                        </div>
                       </div>
                       {a.details && (
-                        <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words max-w-full">{a.details}</div>
+                        <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap break-words max-w-full">
+                          {a.details}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1649,8 +1943,8 @@ const ResultDetail = ({
           </Card>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   // === 비교 모드 헤더 ===
   const renderCompareHeader = () => (
@@ -1662,7 +1956,10 @@ const ResultDetail = ({
         <div className="flex gap-2">
           {processedResults.map((result, index) => (
             <Badge key={result.id} variant="outline" className="gap-2">
-              <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: `hsl(${index * 60}, 70%, 50%)` }} />
+              <div
+                className={`w-3 h-3 rounded-full`}
+                style={{ backgroundColor: `hsl(${index * 60}, 70%, 50%)` }}
+              />
               결과 {index + 1}
             </Badge>
           ))}
@@ -1671,7 +1968,11 @@ const ResultDetail = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {processedResults.map((result, index) => (
-          <Card key={result.id} className="border-l-4" style={{ borderLeftColor: `hsl(${index * 60}, 70%, 50%)` }}>
+          <Card
+            key={result.id}
+            className="border-l-4"
+            style={{ borderLeftColor: `hsl(${index * 60}, 70%, 50%)` }}
+          >
             <CardContent className="pt-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -1692,7 +1993,7 @@ const ResultDetail = ({
         ))}
       </div>
     </div>
-  )
+  );
 
   // === 단일 결과 개요 ===
   const renderSingleOverview = (result) => (
@@ -1700,9 +2001,7 @@ const ResultDetail = ({
       <Card className="border-l-4 border-l-blue-500 w-full overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">
-              분석 결과 상세 정보
-            </CardTitle>
+            <CardTitle className="text-lg">분석 결과 상세 정보</CardTitle>
             <Badge variant={getStatusBadgeVariant(result.status)}>
               {result.status}
             </Badge>
@@ -1711,52 +2010,96 @@ const ResultDetail = ({
         <CardContent className="space-y-4 max-w-full overflow-hidden">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">분석 날짜</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                분석 날짜
+              </div>
               <div className="text-sm">{formatDate(result.analysisDate)}</div>
             </div>
             <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">NE ID</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                NE ID
+              </div>
               <div className="text-sm">{result.neId}</div>
             </div>
             <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">Cell ID</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                Cell ID
+              </div>
               <div className="text-sm">{result.cellId}</div>
             </div>
             <div className="space-y-1">
-              <div className="text-sm font-medium text-muted-foreground">LLM 모델</div>
-              <div className="text-sm">{result.llmModel || 'N/A'}</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                LLM 모델
+              </div>
+              <div className="text-sm">{result.llmModel || "N/A"}</div>
             </div>
           </div>
 
-          {result.analysisResult && (
-            <div className="space-y-2 max-w-full overflow-hidden">
-              <div className="text-sm font-medium text-muted-foreground">분석 결과</div>
-              <div className="text-sm bg-muted p-3 rounded-md max-h-48 overflow-y-auto break-words whitespace-pre-wrap w-full">
-                {result.analysisResult}
+          {(() => {
+            const { analysis } = extractAnalysisData(result);
+            const { summaryText } = extractSummaryText(analysis);
+            const hasSummary =
+              typeof summaryText === "string" &&
+              summaryText.trim() &&
+              summaryText !== "요약 정보가 없습니다.";
+            if (!hasSummary) return null;
+            return (
+              <div className="space-y-2 max-w-full overflow-hidden">
+                <div className="text-sm font-medium text-muted-foreground">
+                  분석 결과
+                </div>
+                <div className="text-sm bg-muted p-3 rounded-md max-h-48 overflow-y-auto break-words whitespace-pre-wrap w-full">
+                  {summaryText}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
-          {result.recommendations && result.recommendations.length > 0 && (
-            <div className="space-y-2 max-w-full overflow-hidden">
-              <div className="text-sm font-medium text-muted-foreground">권장 사항</div>
-              <div className="space-y-1 max-w-full overflow-hidden">
-                {result.recommendations.map((rec, index) => (
-                  <div key={index} className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500 break-words whitespace-pre-wrap max-w-full">
-                    {rec}
-                  </div>
-                ))}
+          {(() => {
+            const { analysis } = extractAnalysisData(result);
+            let recommendationItems = [];
+            if (Array.isArray(analysis?.recommended_actions)) {
+              recommendationItems = analysis.recommended_actions;
+            } else if (
+              typeof analysis?.recommended_actions === "string" &&
+              analysis.recommended_actions.trim()
+            ) {
+              recommendationItems = [analysis.recommended_actions];
+            } else if (Array.isArray(analysis?.recommendations)) {
+              recommendationItems = analysis.recommendations;
+            } else if (
+              typeof analysis?.recommendations === "string" &&
+              analysis.recommendations.trim()
+            ) {
+              recommendationItems = [analysis.recommendations];
+            }
+            if (!recommendationItems.length) return null;
+            return (
+              <div className="space-y-2 max-w-full overflow-hidden">
+                <div className="text-sm font-medium text-muted-foreground">
+                  권장 사항
+                </div>
+                <div className="space-y-1 max-w-full overflow-hidden">
+                  {recommendationItems.map((rec, index) => (
+                    <div
+                      key={index}
+                      className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500 break-words whitespace-pre-wrap max-w-full"
+                    >
+                      {typeof rec === "string" ? rec : JSON.stringify(rec)}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
-  )
+  );
 
   // === Choi 알고리즘 결과 렌더링 ===
   const renderChoiAlgorithmResult = () => (
-            <Card className="border-l-4 border-l-purple-500">
+    <Card className="border-l-4 border-l-purple-500">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1771,7 +2114,7 @@ const ResultDetail = ({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => handleShowHelp('choi')}
+            onClick={() => handleShowHelp("choi")}
             className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
           >
             <HelpCircle className="h-4 w-4" />
@@ -1802,15 +2145,15 @@ const ResultDetail = ({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 
   // === 마할라노비스 거리 알고리즘 결과 렌더링 ===
   const renderMahalanobisResult = () => {
-    console.log('🎨 마할라노비스 렌더링 상태:', {
+    console.log("🎨 마할라노비스 렌더링 상태:", {
       mahalanobisResult,
       loading,
-      resultsLength: results.length
-    })
+      resultsLength: results.length,
+    });
 
     if (!mahalanobisResult) {
       return (
@@ -1826,20 +2169,24 @@ const ResultDetail = ({
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <p className="text-muted-foreground">분석 데이터를 불러오는 중...</p>
+                  <p className="text-muted-foreground">
+                    분석 데이터를 불러오는 중...
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-muted-foreground">분석 데이터를 기다리는 중...</p>
+                  <p className="text-muted-foreground">
+                    분석 데이터를 기다리는 중...
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    결과: {results.length}개, 로딩: {loading ? '예' : '아니오'}
+                    결과: {results.length}개, 로딩: {loading ? "예" : "아니오"}
                   </p>
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
-      )
+      );
     }
 
     if (mahalanobisResult.error) {
@@ -1858,26 +2205,34 @@ const ResultDetail = ({
             </div>
           </CardContent>
         </Card>
-      )
+      );
     }
 
     const getAlarmColor = (level) => {
       switch (level) {
-        case 'critical': return 'text-red-600 bg-red-50 border-red-200'
-        case 'warning': return 'text-orange-600 bg-orange-50 border-orange-200'
-        case 'caution': return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-        default: return 'text-green-600 bg-green-50 border-green-200'
+        case "critical":
+          return "text-red-600 bg-red-50 border-red-200";
+        case "warning":
+          return "text-orange-600 bg-orange-50 border-orange-200";
+        case "caution":
+          return "text-yellow-600 bg-yellow-50 border-yellow-200";
+        default:
+          return "text-green-600 bg-green-50 border-green-200";
       }
-    }
+    };
 
     const getAlarmIcon = (level) => {
       switch (level) {
-        case 'critical': return <AlertTriangle className="h-5 w-5" />
-        case 'warning': return <AlertCircle className="h-5 w-5" />
-        case 'caution': return <Clock className="h-5 w-5" />
-        default: return <Check className="h-5 w-5" />
+        case "critical":
+          return <AlertTriangle className="h-5 w-5" />;
+        case "warning":
+          return <AlertCircle className="h-5 w-5" />;
+        case "caution":
+          return <Clock className="h-5 w-5" />;
+        default:
+          return <Check className="h-5 w-5" />;
       }
-    }
+    };
 
     return (
       <Card className="border-l-4 border-l-orange-500">
@@ -1892,7 +2247,7 @@ const ResultDetail = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleShowHelp('mahalanobis')}
+              onClick={() => handleShowHelp("mahalanobis")}
               className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
             >
               <HelpCircle className="h-4 w-4" />
@@ -1904,35 +2259,57 @@ const ResultDetail = ({
         </CardHeader>
         <CardContent className="space-y-6">
           {/* 종합 건강 상태 */}
-          <div className={`p-4 rounded-lg border ${getAlarmColor(mahalanobisResult.alarmLevel)}`}>
+          <div
+            className={`p-4 rounded-lg border ${getAlarmColor(
+              mahalanobisResult.alarmLevel
+            )}`}
+          >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 {getAlarmIcon(mahalanobisResult.alarmLevel)}
                 <span className="font-semibold">종합 건강 상태</span>
               </div>
-              <Badge variant={mahalanobisResult.alarmLevel === 'normal' ? 'default' : 'destructive'}>
-                {mahalanobisResult.alarmLevel === 'normal' ? '정상' :
-                 mahalanobisResult.alarmLevel === 'caution' ? '주의' :
-                 mahalanobisResult.alarmLevel === 'warning' ? '경고' : '심각'}
+              <Badge
+                variant={
+                  mahalanobisResult.alarmLevel === "normal"
+                    ? "default"
+                    : "destructive"
+                }
+              >
+                {mahalanobisResult.alarmLevel === "normal"
+                  ? "정상"
+                  : mahalanobisResult.alarmLevel === "caution"
+                  ? "주의"
+                  : mahalanobisResult.alarmLevel === "warning"
+                  ? "경고"
+                  : "심각"}
               </Badge>
             </div>
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">총 KPI 수:</span>
-                <div className="font-medium">{mahalanobisResult.totalKpis}개</div>
+                <div className="font-medium">
+                  {mahalanobisResult.totalKpis}개
+                </div>
               </div>
               <div>
                 <span className="text-muted-foreground">이상 KPI 수:</span>
-                <div className="font-medium">{mahalanobisResult.abnormalKpis.length}개</div>
+                <div className="font-medium">
+                  {mahalanobisResult.abnormalKpis.length}개
+                </div>
               </div>
               <div>
                 <span className="text-muted-foreground">이상 점수:</span>
-                <div className="font-medium">{(mahalanobisResult.abnormalScore * 100).toFixed(1)}%</div>
+                <div className="font-medium">
+                  {(mahalanobisResult.abnormalScore * 100).toFixed(1)}%
+                </div>
               </div>
             </div>
             <div className="mt-2 text-sm">
               <span className="text-muted-foreground">판정:</span>
-              <span className="ml-1">{mahalanobisResult.analysis.screening.description}</span>
+              <span className="ml-1">
+                {mahalanobisResult.analysis.screening.description}
+              </span>
             </div>
           </div>
 
@@ -1945,18 +2322,27 @@ const ResultDetail = ({
               </h4>
               <div className="space-y-2">
                 {mahalanobisResult.abnormalKpis.slice(0, 5).map((kpi, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                  >
                     <div>
                       <div className="font-medium">{kpi.kpiName}</div>
                       <div className="text-sm text-muted-foreground">
-                        N-1: {kpi.n1Value?.toFixed(2)} → N: {kpi.nValue?.toFixed(2)}
+                        N-1: {kpi.n1Value?.toFixed(2)} → N:{" "}
+                        {kpi.nValue?.toFixed(2)}
                       </div>
                     </div>
                     <div className="text-right">
-                      <Badge variant={
-                        kpi.severity === 'critical' ? 'destructive' :
-                        kpi.severity === 'warning' ? 'secondary' : 'outline'
-                      }>
+                      <Badge
+                        variant={
+                          kpi.severity === "critical"
+                            ? "destructive"
+                            : kpi.severity === "warning"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
                         {(kpi.changeRate * 100).toFixed(1)}%
                       </Badge>
                     </div>
@@ -1980,23 +2366,38 @@ const ResultDetail = ({
                   <div className="text-lg font-bold text-blue-600">
                     {mahalanobisResult.analysis.drilldown.summary.totalAnalyzed}
                   </div>
-                  <div className="text-xs text-muted-foreground">분석된 KPI</div>
+                  <div className="text-xs text-muted-foreground">
+                    분석된 KPI
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-green-600">
-                    {mahalanobisResult.analysis.drilldown.summary.statisticallySignificant}
+                    {
+                      mahalanobisResult.analysis.drilldown.summary
+                        .statisticallySignificant
+                    }
                   </div>
-                  <div className="text-xs text-muted-foreground">통계적 유의성</div>
+                  <div className="text-xs text-muted-foreground">
+                    통계적 유의성
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-orange-600">
-                    {mahalanobisResult.analysis.drilldown.summary.highConfidenceFindings}
+                    {
+                      mahalanobisResult.analysis.drilldown.summary
+                        .highConfidenceFindings
+                    }
                   </div>
-                  <div className="text-xs text-muted-foreground">고신뢰도 발견</div>
+                  <div className="text-xs text-muted-foreground">
+                    고신뢰도 발견
+                  </div>
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-purple-600">
-                    {mahalanobisResult.analysis.drilldown.summary.distributionChanges}
+                    {
+                      mahalanobisResult.analysis.drilldown.summary
+                        .distributionChanges
+                    }
                   </div>
                   <div className="text-xs text-muted-foreground">분포 변화</div>
                 </div>
@@ -2004,151 +2405,203 @@ const ResultDetail = ({
             )}
 
             {/* 개별 KPI 통계 분석 결과 */}
-            {mahalanobisResult.analysis?.drilldown?.statisticalAnalysis?.length > 0 && (
+            {mahalanobisResult.analysis?.drilldown?.statisticalAnalysis
+              ?.length > 0 && (
               <div className="space-y-4">
                 <h5 className="font-medium text-sm">개별 KPI 통계 분석 결과</h5>
-                {mahalanobisResult.analysis.drilldown.statisticalAnalysis.map((analysis, idx) => (
-                  <div key={idx} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{analysis.kpiName}</span>
-                        <Badge variant={
-                          analysis.severity === 'critical' ? 'destructive' :
-                          analysis.severity === 'warning' ? 'secondary' : 'outline'
-                        }>
-                          {analysis.severity}
-                        </Badge>
-                        <Badge variant={
-                          analysis.confidence === 'high' ? 'default' :
-                          analysis.confidence === 'medium' ? 'secondary' : 'outline'
-                        }>
-                          신뢰도: {analysis.confidence}
-                        </Badge>
+                {mahalanobisResult.analysis.drilldown.statisticalAnalysis.map(
+                  (analysis, idx) => (
+                    <div key={idx} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {analysis.kpiName}
+                          </span>
+                          <Badge
+                            variant={
+                              analysis.severity === "critical"
+                                ? "destructive"
+                                : analysis.severity === "warning"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            {analysis.severity}
+                          </Badge>
+                          <Badge
+                            variant={
+                              analysis.confidence === "high"
+                                ? "default"
+                                : analysis.confidence === "medium"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            신뢰도: {analysis.confidence}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          변화율: {(analysis.changeRate * 100).toFixed(1)}%
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        변화율: {(analysis.changeRate * 100).toFixed(1)}%
-                      </div>
+
+                      {!analysis.statisticalTests.error && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Mann-Whitney U Test 결과 */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h6 className="text-sm font-medium flex items-center gap-2">
+                                <Target className="h-3 w-3" />
+                                Mann-Whitney U Test
+                              </h6>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleShowHelp("mann-whitney")}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-6 w-6 p-0"
+                              >
+                                <HelpCircle className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="text-xs space-y-1">
+                              <div className="flex justify-between">
+                                <span>U 통계량:</span>
+                                <span className="font-mono">
+                                  {analysis.statisticalTests.mannWhitney.U?.toFixed(
+                                    2
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Z-score:</span>
+                                <span className="font-mono">
+                                  {analysis.statisticalTests.mannWhitney.zScore?.toFixed(
+                                    3
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>p-value:</span>
+                                <span
+                                  className={`font-mono ${
+                                    analysis.statisticalTests.mannWhitney
+                                      .significant
+                                      ? "text-red-600 font-bold"
+                                      : "text-green-600"
+                                  }`}
+                                >
+                                  {analysis.statisticalTests.mannWhitney.pValue?.toFixed(
+                                    4
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>효과 크기:</span>
+                                <span className="font-mono">
+                                  {analysis.statisticalTests.mannWhitney.effectSize?.toFixed(
+                                    3
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            <div
+                              className={`text-xs p-2 rounded ${
+                                analysis.statisticalTests.mannWhitney
+                                  .significant
+                                  ? "bg-red-50 text-red-700 border border-red-200"
+                                  : "bg-green-50 text-green-700 border border-green-200"
+                              }`}
+                            >
+                              {
+                                analysis.statisticalTests.mannWhitney
+                                  .interpretation
+                              }
+                            </div>
+                          </div>
+
+                          {/* Kolmogorov-Smirnov Test 결과 */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h6 className="text-sm font-medium flex items-center gap-2">
+                                <BarChart3 className="h-3 w-3" />
+                                Kolmogorov-Smirnov Test
+                              </h6>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleShowHelp("ks-test")}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 w-6 p-0"
+                              >
+                                <HelpCircle className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="text-xs space-y-1">
+                              <div className="flex justify-between">
+                                <span>D 통계량:</span>
+                                <span className="font-mono">
+                                  {analysis.statisticalTests.kolmogorovSmirnov.D?.toFixed(
+                                    4
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>p-value:</span>
+                                <span
+                                  className={`font-mono ${
+                                    analysis.statisticalTests.kolmogorovSmirnov
+                                      .significant
+                                      ? "text-red-600 font-bold"
+                                      : "text-green-600"
+                                  }`}
+                                >
+                                  {analysis.statisticalTests.kolmogorovSmirnov.pValue?.toFixed(
+                                    4
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>분포 차이:</span>
+                                <span className="font-mono">
+                                  {
+                                    analysis.statisticalTests.kolmogorovSmirnov
+                                      .distributionDifference
+                                  }
+                                </span>
+                              </div>
+                            </div>
+                            <div
+                              className={`text-xs p-2 rounded ${
+                                analysis.statisticalTests.kolmogorovSmirnov
+                                  .significant
+                                  ? "bg-red-50 text-red-700 border border-red-200"
+                                  : "bg-green-50 text-green-700 border border-green-200"
+                              }`}
+                            >
+                              {
+                                analysis.statisticalTests.kolmogorovSmirnov
+                                  .interpretation
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {analysis.statisticalTests.error && (
+                        <div className="text-xs p-2 bg-red-50 text-red-700 border border-red-200 rounded">
+                          {analysis.statisticalTests.error}
+                        </div>
+                      )}
                     </div>
-
-                    {!analysis.statisticalTests.error && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Mann-Whitney U Test 결과 */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h6 className="text-sm font-medium flex items-center gap-2">
-                              <Target className="h-3 w-3" />
-                              Mann-Whitney U Test
-                            </h6>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleShowHelp('mann-whitney')}
-                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-6 w-6 p-0"
-                            >
-                              <HelpCircle className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="text-xs space-y-1">
-                            <div className="flex justify-between">
-                              <span>U 통계량:</span>
-                              <span className="font-mono">
-                                {analysis.statisticalTests.mannWhitney.U?.toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Z-score:</span>
-                              <span className="font-mono">
-                                {analysis.statisticalTests.mannWhitney.zScore?.toFixed(3)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>p-value:</span>
-                              <span className={`font-mono ${
-                                analysis.statisticalTests.mannWhitney.significant
-                                  ? 'text-red-600 font-bold' : 'text-green-600'
-                              }`}>
-                                {analysis.statisticalTests.mannWhitney.pValue?.toFixed(4)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>효과 크기:</span>
-                              <span className="font-mono">
-                                {analysis.statisticalTests.mannWhitney.effectSize?.toFixed(3)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className={`text-xs p-2 rounded ${
-                            analysis.statisticalTests.mannWhitney.significant
-                              ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-green-50 text-green-700 border border-green-200'
-                          }`}>
-                            {analysis.statisticalTests.mannWhitney.interpretation}
-                          </div>
-                        </div>
-
-                        {/* Kolmogorov-Smirnov Test 결과 */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h6 className="text-sm font-medium flex items-center gap-2">
-                              <BarChart3 className="h-3 w-3" />
-                              Kolmogorov-Smirnov Test
-                            </h6>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleShowHelp('ks-test')}
-                              className="text-green-600 hover:text-green-700 hover:bg-green-50 h-6 w-6 p-0"
-                            >
-                              <HelpCircle className="h-3 w-3" />
-                            </Button>
-                          </div>
-                          <div className="text-xs space-y-1">
-                            <div className="flex justify-between">
-                              <span>D 통계량:</span>
-                              <span className="font-mono">
-                                {analysis.statisticalTests.kolmogorovSmirnov.D?.toFixed(4)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>p-value:</span>
-                              <span className={`font-mono ${
-                                analysis.statisticalTests.kolmogorovSmirnov.significant
-                                  ? 'text-red-600 font-bold' : 'text-green-600'
-                              }`}>
-                                {analysis.statisticalTests.kolmogorovSmirnov.pValue?.toFixed(4)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>분포 차이:</span>
-                              <span className="font-mono">
-                                {analysis.statisticalTests.kolmogorovSmirnov.distributionDifference}
-                              </span>
-                            </div>
-                          </div>
-                          <div className={`text-xs p-2 rounded ${
-                            analysis.statisticalTests.kolmogorovSmirnov.significant
-                              ? 'bg-red-50 text-red-700 border border-red-200'
-                              : 'bg-green-50 text-green-700 border border-green-200'
-                          }`}>
-                            {analysis.statisticalTests.kolmogorovSmirnov.interpretation}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {analysis.statisticalTests.error && (
-                      <div className="text-xs p-2 bg-red-50 text-red-700 border border-red-200 rounded">
-                        {analysis.statisticalTests.error}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
 
             {/* 변화점 탐지 계획 */}
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <h6 className="text-sm font-medium text-blue-800 mb-2">변화점 탐지 알고리즘</h6>
+              <h6 className="text-sm font-medium text-blue-800 mb-2">
+                변화점 탐지 알고리즘
+              </h6>
               <div className="text-xs text-blue-700 space-y-1">
                 <div>• Cusum 알고리즘을 통한 변화점 자동 탐지 예정</div>
                 <div>• 정확한 문제 발생 시각 특정 및 원인 분석</div>
@@ -2158,8 +2611,8 @@ const ResultDetail = ({
           </div>
         </CardContent>
       </Card>
-    )
-  }
+    );
+  };
 
   // === PEG 비교 결과 렌더링 ===
   const renderPegComparisonResult = () => {
@@ -2174,11 +2627,13 @@ const ResultDetail = ({
           </CardHeader>
           <CardContent>
             <div className="text-center py-4">
-              <p className="text-muted-foreground">PEG 비교 데이터를 불러오는 중...</p>
+              <p className="text-muted-foreground">
+                PEG 비교 데이터를 불러오는 중...
+              </p>
             </div>
           </CardContent>
         </Card>
-      )
+      );
     }
 
     return (
@@ -2194,7 +2649,7 @@ const ResultDetail = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleShowHelp('peg-comparison')}
+              onClick={() => handleShowHelp("peg-comparison")}
               className="text-green-600 hover:text-green-700 hover:bg-green-50"
             >
               <HelpCircle className="h-4 w-4" />
@@ -2208,24 +2663,26 @@ const ResultDetail = ({
           {/* 요약 통계 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <div className="text-lg font-bold text-blue-600">{pegComparisonResult.length}</div>
+              <div className="text-lg font-bold text-blue-600">
+                {pegComparisonResult.length}
+              </div>
               <div className="text-xs text-muted-foreground">총 PEG 수</div>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
               <div className="text-lg font-bold text-green-600">
-                {pegComparisonResult.filter(p => p.trend === 'up').length}
+                {pegComparisonResult.filter((p) => p.trend === "up").length}
               </div>
               <div className="text-xs text-muted-foreground">개선 PEG</div>
             </div>
             <div className="text-center p-3 bg-red-50 rounded-lg">
               <div className="text-lg font-bold text-red-600">
-                {pegComparisonResult.filter(p => p.trend === 'down').length}
+                {pegComparisonResult.filter((p) => p.trend === "down").length}
               </div>
               <div className="text-xs text-muted-foreground">하락 PEG</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <div className="text-lg font-bold text-gray-600">
-                {pegComparisonResult.filter(p => p.trend === 'stable').length}
+                {pegComparisonResult.filter((p) => p.trend === "stable").length}
               </div>
               <div className="text-xs text-muted-foreground">안정 PEG</div>
             </div>
@@ -2272,20 +2729,39 @@ const ResultDetail = ({
                           {peg.n_rsd.toFixed(1)}%
                         </td>
                         <td className="p-3 text-center">
-                          <Badge variant={
-                            peg.significance === 'high' ? 'destructive' :
-                            peg.significance === 'medium' ? 'secondary' : 'outline'
-                          }>
-                            {peg.change_percent > 0 ? '+' : ''}{peg.change_percent.toFixed(1)}%
+                          <Badge
+                            variant={
+                              peg.significance === "high"
+                                ? "destructive"
+                                : peg.significance === "medium"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            {peg.change_percent > 0 ? "+" : ""}
+                            {peg.change_percent.toFixed(1)}%
                           </Badge>
                         </td>
                         <td className="p-3 text-center">
-                          <Badge variant={
-                            peg.trend === 'up' ? 'default' :
-                            peg.trend === 'down' ? 'destructive' : 'secondary'
-                          }>
-                            {peg.trend === 'up' ? '📈' : peg.trend === 'down' ? '📉' : '➡️'}
-                            {peg.trend === 'up' ? '개선' : peg.trend === 'down' ? '하락' : '안정'}
+                          <Badge
+                            variant={
+                              peg.trend === "up"
+                                ? "default"
+                                : peg.trend === "down"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {peg.trend === "up"
+                              ? "📈"
+                              : peg.trend === "down"
+                              ? "📉"
+                              : "➡️"}
+                            {peg.trend === "up"
+                              ? "개선"
+                              : peg.trend === "down"
+                              ? "하락"
+                              : "안정"}
                           </Badge>
                         </td>
                       </tr>
@@ -2302,14 +2778,12 @@ const ResultDetail = ({
               <BarChart3 className="h-4 w-4" />
               PEG 성능 비교 차트
             </h4>
-            <div className="h-64">
-              {renderKpiChart()}
-            </div>
+            <div className="h-64">{renderKpiChart()}</div>
           </div>
         </CardContent>
       </Card>
-    )
-  }
+    );
+  };
 
   // === 모달 컨텐츠 ===
   const renderContent = () => {
@@ -2321,7 +2795,7 @@ const ResultDetail = ({
             <p className="text-muted-foreground">분석 결과를 불러오는 중...</p>
           </div>
         </div>
-      )
+      );
     }
 
     if (error) {
@@ -2331,13 +2805,16 @@ const ResultDetail = ({
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">데이터 로딩 오류</h3>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={() => fetchResultDetails(resultIds)} variant="outline">
+            <Button
+              onClick={() => fetchResultDetails(resultIds)}
+              variant="outline"
+            >
               <RefreshCw className="h-4 w-4 mr-2" />
               다시 시도
             </Button>
           </div>
         </div>
-      )
+      );
     }
 
     if (processedResults.length === 0) {
@@ -2345,17 +2822,21 @@ const ResultDetail = ({
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">분석 결과를 찾을 수 없습니다.</p>
+            <p className="text-muted-foreground">
+              분석 결과를 찾을 수 없습니다.
+            </p>
           </div>
         </div>
-      )
+      );
     }
 
     return (
       <div className="space-y-6">
         {/* 기본 정보 요약 */}
         <div className="space-y-6">
-          {isCompareMode ? renderCompareHeader() : renderSingleOverview(processedResults[0])}
+          {isCompareMode
+            ? renderCompareHeader()
+            : renderSingleOverview(processedResults[0])}
         </div>
 
         {/* 알고리즘 결과 섹션 */}
@@ -2384,28 +2865,28 @@ const ResultDetail = ({
           {renderLLMReport(processedResults)}
         </div>
       </div>
-    )
-  }
+    );
+  };
 
   // === 도움말 모달 핸들러 ===
   const handleShowHelp = useCallback((algorithm) => {
     setHelpModal({
       isOpen: true,
-      algorithm
-    })
-  }, [])
+      algorithm,
+    });
+  }, []);
 
   const handleCloseHelp = useCallback(() => {
     setHelpModal({
       isOpen: false,
-      algorithm: null
-    })
-  }, [])
+      algorithm: null,
+    });
+  }, []);
 
   // === 도움말 컨텐츠 렌더링 ===
   const renderHelpContent = () => {
     switch (helpModal.algorithm) {
-      case 'choi':
+      case "choi":
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -2415,33 +2896,55 @@ const ResultDetail = ({
 
             <div className="space-y-4 text-sm">
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <h4 className="font-semibold text-purple-800 mb-2">🔍 알고리즘 개요</h4>
+                <h4 className="font-semibold text-purple-800 mb-2">
+                  🔍 알고리즘 개요
+                </h4>
                 <p className="text-purple-700">
                   Choi 알고리즘은 품질 저하 판정을 위한 특화된 알고리즘입니다.
-                  현재 준비 단계로, 향후 특정 KPI 패턴을 분석하여 품질 문제를 진단합니다.
+                  현재 준비 단계로, 향후 특정 KPI 패턴을 분석하여 품질 문제를
+                  진단합니다.
                 </p>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-2">📊 신뢰성 기준</h4>
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  📊 신뢰성 기준
+                </h4>
                 <div className="space-y-2 text-blue-700">
-                  <p><strong>준비 단계:</strong> 현재 absent 상태로 표시됩니다.</p>
-                  <p><strong>향후 기준:</strong> 구현 시 품질 저하 판정 정확도 85% 이상 목표</p>
+                  <p>
+                    <strong>준비 단계:</strong> 현재 absent 상태로 표시됩니다.
+                  </p>
+                  <p>
+                    <strong>향후 기준:</strong> 구현 시 품질 저하 판정 정확도
+                    85% 이상 목표
+                  </p>
                 </div>
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-800 mb-2">💡 해석 방법</h4>
+                <h4 className="font-semibold text-green-800 mb-2">
+                  💡 해석 방법
+                </h4>
                 <div className="space-y-2 text-green-700">
-                  <p><strong>정상:</strong> 품질 문제가 감지되지 않음</p>
-                  <p><strong>주의:</strong> 잠재적 품질 저하 가능성</p>
-                  <p><strong>경고:</strong> 즉각적인 조치 필요</p>
-                  <p><strong>심각:</strong> 긴급 대응 요구</p>
+                  <p>
+                    <strong>정상:</strong> 품질 문제가 감지되지 않음
+                  </p>
+                  <p>
+                    <strong>주의:</strong> 잠재적 품질 저하 가능성
+                  </p>
+                  <p>
+                    <strong>경고:</strong> 즉각적인 조치 필요
+                  </p>
+                  <p>
+                    <strong>심각:</strong> 긴급 대응 요구
+                  </p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h4 className="font-semibold text-yellow-800 mb-2">⚠️ 주의사항</h4>
+                <h4 className="font-semibold text-yellow-800 mb-2">
+                  ⚠️ 주의사항
+                </h4>
                 <div className="space-y-1 text-yellow-700 text-xs">
                   <p>• 현재 구현 준비 단계입니다.</p>
                   <p>• Choi 알고리즘 문서에 따라 구현될 예정입니다.</p>
@@ -2450,48 +2953,79 @@ const ResultDetail = ({
               </div>
             </div>
           </div>
-        )
+        );
 
-      case 'mahalanobis':
+      case "mahalanobis":
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
               <Target className="h-12 w-12 text-orange-600 mx-auto mb-2" />
-              <h3 className="text-lg font-semibold">마할라노비스 거리 분석 도움말</h3>
+              <h3 className="text-lg font-semibold">
+                마할라노비스 거리 분석 도움말
+              </h3>
             </div>
 
             <div className="space-y-4 text-sm">
               <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                <h4 className="font-semibold text-orange-800 mb-2">🔍 알고리즘 개요</h4>
+                <h4 className="font-semibold text-orange-800 mb-2">
+                  🔍 알고리즘 개요
+                </h4>
                 <p className="text-orange-700">
-                  다차원 데이터에서 이상치를 탐지하는 통계적 방법입니다.
-                  여러 KPI를 동시에 고려하여 종합적인 건강 상태를 평가합니다.
+                  다차원 데이터에서 이상치를 탐지하는 통계적 방법입니다. 여러
+                  KPI를 동시에 고려하여 종합적인 건강 상태를 평가합니다.
                 </p>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-2">📊 신뢰성 기준</h4>
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  📊 신뢰성 기준
+                </h4>
                 <div className="space-y-2 text-blue-700">
-                  <p><strong>이상 점수 범위:</strong> 0.0 ~ 1.0</p>
-                  <p><strong>주의 임계치:</strong> 0.1 (10% 이상 KPI 이상)</p>
-                  <p><strong>경고 임계치:</strong> 0.2 (20% 이상 KPI 이상)</p>
-                  <p><strong>심각 임계치:</strong> 0.3 (30% 이상 KPI 이상)</p>
-                  <p><strong>신뢰도:</strong> 95% 이상의 정확도 목표</p>
+                  <p>
+                    <strong>이상 점수 범위:</strong> 0.0 ~ 1.0
+                  </p>
+                  <p>
+                    <strong>주의 임계치:</strong> 0.1 (10% 이상 KPI 이상)
+                  </p>
+                  <p>
+                    <strong>경고 임계치:</strong> 0.2 (20% 이상 KPI 이상)
+                  </p>
+                  <p>
+                    <strong>심각 임계치:</strong> 0.3 (30% 이상 KPI 이상)
+                  </p>
+                  <p>
+                    <strong>신뢰도:</strong> 95% 이상의 정확도 목표
+                  </p>
                 </div>
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-800 mb-2">💡 해석 방법</h4>
+                <h4 className="font-semibold text-green-800 mb-2">
+                  💡 해석 방법
+                </h4>
                 <div className="space-y-2 text-green-700">
-                  <p><strong>정상 (Normal):</strong> 이상 점수가 낮아 안정적 상태</p>
-                  <p><strong>주의 (Caution):</strong> 일부 KPI에서 변화 감지, 모니터링 필요</p>
-                  <p><strong>경고 (Warning):</strong> 다수 KPI 이상, 즉각적 검토 필요</p>
-                  <p><strong>심각 (Critical):</strong> 심각한 이상 패턴, 긴급 조치 요구</p>
+                  <p>
+                    <strong>정상 (Normal):</strong> 이상 점수가 낮아 안정적 상태
+                  </p>
+                  <p>
+                    <strong>주의 (Caution):</strong> 일부 KPI에서 변화 감지,
+                    모니터링 필요
+                  </p>
+                  <p>
+                    <strong>경고 (Warning):</strong> 다수 KPI 이상, 즉각적 검토
+                    필요
+                  </p>
+                  <p>
+                    <strong>심각 (Critical):</strong> 심각한 이상 패턴, 긴급
+                    조치 요구
+                  </p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h4 className="font-semibold text-yellow-800 mb-2">⚠️ 주의사항</h4>
+                <h4 className="font-semibold text-yellow-800 mb-2">
+                  ⚠️ 주의사항
+                </h4>
                 <div className="space-y-1 text-yellow-700 text-xs">
                   <p>• 다차원 데이터의 상관관계를 고려합니다.</p>
                   <p>• 개별 KPI 변화율 10% 이상을 이상으로 간주합니다.</p>
@@ -2501,85 +3035,128 @@ const ResultDetail = ({
               </div>
             </div>
           </div>
-        )
+        );
 
-      case 'mann-whitney':
+      case "mann-whitney":
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
               <Target className="h-12 w-12 text-blue-600 mx-auto mb-2" />
-              <h3 className="text-lg font-semibold">Mann-Whitney U Test 도움말</h3>
+              <h3 className="text-lg font-semibold">
+                Mann-Whitney U Test 도움말
+              </h3>
             </div>
 
             <div className="space-y-4 text-sm">
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-2">🔍 알고리즘 개요</h4>
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  🔍 알고리즘 개요
+                </h4>
                 <p className="text-blue-700">
-                  두 독립적인 그룹 간의 차이를 비교하는 비모수적 통계 검정입니다.
-                  데이터의 정규성 가정 없이 평균 차이의 통계적 유의성을 검정합니다.
+                  두 독립적인 그룹 간의 차이를 비교하는 비모수적 통계
+                  검정입니다. 데이터의 정규성 가정 없이 평균 차이의 통계적
+                  유의성을 검정합니다.
                 </p>
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-800 mb-2">📊 신뢰성 기준</h4>
+                <h4 className="font-semibold text-green-800 mb-2">
+                  📊 신뢰성 기준
+                </h4>
                 <div className="space-y-2 text-green-700">
-                  <p><strong>p-value:</strong> 0.05 미만이면 통계적으로 유의함</p>
-                  <p><strong>효과 크기 (Effect Size):</strong></p>
+                  <p>
+                    <strong>p-value:</strong> 0.05 미만이면 통계적으로 유의함
+                  </p>
+                  <p>
+                    <strong>효과 크기 (Effect Size):</strong>
+                  </p>
                   <ul className="ml-4 space-y-1">
                     <li>• 0.2: 작은 효과</li>
                     <li>• 0.5: 중간 효과</li>
                     <li>• 0.8: 큰 효과</li>
                   </ul>
-                  <p><strong>Z-score:</strong> ±1.96 이상이면 95% 신뢰수준에서 유의함</p>
+                  <p>
+                    <strong>Z-score:</strong> ±1.96 이상이면 95% 신뢰수준에서
+                    유의함
+                  </p>
                 </div>
               </div>
 
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <h4 className="font-semibold text-purple-800 mb-2">💡 해석 방법</h4>
+                <h4 className="font-semibold text-purple-800 mb-2">
+                  💡 해석 방법
+                </h4>
                 <div className="space-y-2 text-purple-700">
-                  <p><strong>p &lt; 0.05:</strong> 두 그룹 간에 통계적으로 유의한 차이가 있음</p>
-                  <p><strong>p ≥ 0.05:</strong> 우연에 의한 차이일 가능성이 높음</p>
-                  <p><strong>큰 효과 크기:</strong> 실질적으로 의미 있는 차이</p>
-                  <p><strong>작은 효과 크기:</strong> 통계적 유의성은 있지만 실질적 차이는 미미</p>
+                  <p>
+                    <strong>p &lt; 0.05:</strong> 두 그룹 간에 통계적으로 유의한
+                    차이가 있음
+                  </p>
+                  <p>
+                    <strong>p ≥ 0.05:</strong> 우연에 의한 차이일 가능성이 높음
+                  </p>
+                  <p>
+                    <strong>큰 효과 크기:</strong> 실질적으로 의미 있는 차이
+                  </p>
+                  <p>
+                    <strong>작은 효과 크기:</strong> 통계적 유의성은 있지만
+                    실질적 차이는 미미
+                  </p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h4 className="font-semibold text-yellow-800 mb-2">⚠️ 주의사항</h4>
+                <h4 className="font-semibold text-yellow-800 mb-2">
+                  ⚠️ 주의사항
+                </h4>
                 <div className="space-y-1 text-yellow-700 text-xs">
                   <p>• 데이터의 독립성 가정을 만족해야 합니다.</p>
                   <p>• 표본 크기가 작으면 검정력이 낮아질 수 있습니다.</p>
                   <p>• 이상치에 덜 민감하지만, 분포 모양을 고려해야 합니다.</p>
-                  <p>• p-value만으로 결론을 내리지 말고 효과 크기도 고려하세요.</p>
+                  <p>
+                    • p-value만으로 결론을 내리지 말고 효과 크기도 고려하세요.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
-        )
+        );
 
-      case 'ks-test':
+      case "ks-test":
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
               <BarChart3 className="h-12 w-12 text-green-600 mx-auto mb-2" />
-              <h3 className="text-lg font-semibold">Kolmogorov-Smirnov Test 도움말</h3>
+              <h3 className="text-lg font-semibold">
+                Kolmogorov-Smirnov Test 도움말
+              </h3>
             </div>
 
             <div className="space-y-4 text-sm">
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-800 mb-2">🔍 알고리즘 개요</h4>
+                <h4 className="font-semibold text-green-800 mb-2">
+                  🔍 알고리즘 개요
+                </h4>
                 <p className="text-green-700">
                   두 샘플의 분포가 같은지 비교하는 비모수적 검정입니다.
-                  누적분포함수(CDF)의 최대 차이를 기반으로 분포 차이를 검정합니다.
+                  누적분포함수(CDF)의 최대 차이를 기반으로 분포 차이를
+                  검정합니다.
                 </p>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-2">📊 신뢰성 기준</h4>
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  📊 신뢰성 기준
+                </h4>
                 <div className="space-y-2 text-blue-700">
-                  <p><strong>D 통계량:</strong> 두 CDF 간 최대 차이 (0~1 범위)</p>
-                  <p><strong>p-value:</strong> 0.05 미만이면 분포 차이가 유의함</p>
-                  <p><strong>분포 차이 정도:</strong></p>
+                  <p>
+                    <strong>D 통계량:</strong> 두 CDF 간 최대 차이 (0~1 범위)
+                  </p>
+                  <p>
+                    <strong>p-value:</strong> 0.05 미만이면 분포 차이가 유의함
+                  </p>
+                  <p>
+                    <strong>분포 차이 정도:</strong>
+                  </p>
                   <ul className="ml-4 space-y-1">
                     <li>• Small (D &lt; 0.1): 미미한 차이</li>
                     <li>• Medium (0.1 ≤ D &lt; 0.2): 중간 정도 차이</li>
@@ -2589,17 +3166,30 @@ const ResultDetail = ({
               </div>
 
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                <h4 className="font-semibold text-purple-800 mb-2">💡 해석 방법</h4>
+                <h4 className="font-semibold text-purple-800 mb-2">
+                  💡 해석 방법
+                </h4>
                 <div className="space-y-2 text-purple-700">
-                  <p><strong>p &lt; 0.05:</strong> 두 그룹의 분포가 통계적으로 다름</p>
-                  <p><strong>p ≥ 0.05:</strong> 두 그룹의 분포가 비슷함</p>
-                  <p><strong>D 값이 큼:</strong> 분포 모양의 차이가 큼</p>
-                  <p><strong>D 값이 작음:</strong> 분포가 서로 유사함</p>
+                  <p>
+                    <strong>p &lt; 0.05:</strong> 두 그룹의 분포가 통계적으로
+                    다름
+                  </p>
+                  <p>
+                    <strong>p ≥ 0.05:</strong> 두 그룹의 분포가 비슷함
+                  </p>
+                  <p>
+                    <strong>D 값이 큼:</strong> 분포 모양의 차이가 큼
+                  </p>
+                  <p>
+                    <strong>D 값이 작음:</strong> 분포가 서로 유사함
+                  </p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h4 className="font-semibold text-yellow-800 mb-2">⚠️ 주의사항</h4>
+                <h4 className="font-semibold text-yellow-800 mb-2">
+                  ⚠️ 주의사항
+                </h4>
                 <div className="space-y-1 text-yellow-700 text-xs">
                   <p>• 분포의 모양, 위치, 산포도 차이를 모두 고려합니다.</p>
                   <p>• 표본 크기가 작으면 검정력이 낮아질 수 있습니다.</p>
@@ -2609,9 +3199,9 @@ const ResultDetail = ({
               </div>
             </div>
           </div>
-        )
+        );
 
-      case 'peg-comparison':
+      case "peg-comparison":
         return (
           <div className="space-y-4">
             <div className="text-center mb-6">
@@ -2621,45 +3211,69 @@ const ResultDetail = ({
 
             <div className="space-y-4 text-sm">
               <div className="bg-teal-50 p-4 rounded-lg border border-teal-200">
-                <h4 className="font-semibold text-teal-800 mb-2">🔍 알고리즘 개요</h4>
+                <h4 className="font-semibold text-teal-800 mb-2">
+                  🔍 알고리즘 개요
+                </h4>
                 <p className="text-teal-700">
-                  N-1 기간과 N 기간의 PEG별 성능을 비교하는 분석입니다.
-                  평균, 표준편차, 변화율을 계산하여 성능 트렌드를 분석합니다.
+                  N-1 기간과 N 기간의 PEG별 성능을 비교하는 분석입니다. 평균,
+                  표준편차, 변화율을 계산하여 성능 트렌드를 분석합니다.
                 </p>
               </div>
 
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-2">📊 신뢰성 기준</h4>
+                <h4 className="font-semibold text-blue-800 mb-2">
+                  📊 신뢰성 기준
+                </h4>
                 <div className="space-y-2 text-blue-700">
-                  <p><strong>변화율:</strong></p>
+                  <p>
+                    <strong>변화율:</strong>
+                  </p>
                   <ul className="ml-4 space-y-1">
                     <li>• ±5%: 안정 범위</li>
                     <li>• ±5~10%: 주의 범위</li>
                     <li>• ±10% 초과: 이상 범위</li>
                   </ul>
-                  <p><strong>RSD (상대 표준편차):</strong></p>
+                  <p>
+                    <strong>RSD (상대 표준편차):</strong>
+                  </p>
                   <ul className="ml-4 space-y-1">
                     <li>• &lt; 10%: 매우 안정적</li>
                     <li>• 10~20%: 보통 안정성</li>
                     <li>• &gt; 20%: 불안정적</li>
                   </ul>
-                  <p><strong>가중치:</strong> 1~10 범위로 PEG 중요도 반영</p>
+                  <p>
+                    <strong>가중치:</strong> 1~10 범위로 PEG 중요도 반영
+                  </p>
                 </div>
               </div>
 
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-800 mb-2">💡 해석 방법</h4>
+                <h4 className="font-semibold text-green-800 mb-2">
+                  💡 해석 방법
+                </h4>
                 <div className="space-y-2 text-green-700">
-                  <p><strong>개선 (Up):</strong> N 기간 성능이 향상된 PEG</p>
-                  <p><strong>하락 (Down):</strong> N 기간 성능이 저하된 PEG</p>
-                  <p><strong>안정 (Stable):</strong> 큰 변화 없는 PEG</p>
-                  <p><strong>신뢰도:</strong> 통계 테스트 결과에 따른 분석 신뢰도</p>
-                  <p><strong>RSD 비교:</strong> 기간별 변동성 비교</p>
+                  <p>
+                    <strong>개선 (Up):</strong> N 기간 성능이 향상된 PEG
+                  </p>
+                  <p>
+                    <strong>하락 (Down):</strong> N 기간 성능이 저하된 PEG
+                  </p>
+                  <p>
+                    <strong>안정 (Stable):</strong> 큰 변화 없는 PEG
+                  </p>
+                  <p>
+                    <strong>신뢰도:</strong> 통계 테스트 결과에 따른 분석 신뢰도
+                  </p>
+                  <p>
+                    <strong>RSD 비교:</strong> 기간별 변동성 비교
+                  </p>
                 </div>
               </div>
 
               <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                <h4 className="font-semibold text-yellow-800 mb-2">⚠️ 주의사항</h4>
+                <h4 className="font-semibold text-yellow-800 mb-2">
+                  ⚠️ 주의사항
+                </h4>
                 <div className="space-y-1 text-yellow-700 text-xs">
                   <p>• 데이터의 연속성과 완전성을 확인하세요.</p>
                   <p>• 계절적/주기적 패턴을 고려하여 분석하세요.</p>
@@ -2669,27 +3283,29 @@ const ResultDetail = ({
               </div>
             </div>
           </div>
-        )
+        );
 
       default:
-        return <div>알고리즘을 선택해주세요.</div>
+        return <div>알고리즘을 선택해주세요.</div>;
     }
-  }
+  };
 
   return (
     <>
       {/* 메인 모달 */}
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className={`transition-all duration-500 ease-in-out transform overflow-hidden ${
-          isFullscreen
-            ? 'max-w-[99vw] h-[98vh] w-[99vw] scale-100'
-            : 'max-w-6xl max-h-[90vh] w-auto min-w-[80vw] scale-100'
-        }`}>
+        <DialogContent
+          className={`transition-all duration-500 ease-in-out transform overflow-hidden ${
+            isFullscreen
+              ? "max-w-[99vw] h-[98vh] w-[99vw] scale-100"
+              : "max-w-6xl max-h-[90vh] w-auto min-w-[80vw] scale-100"
+          }`}
+        >
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
                 <Eye className="h-5 w-5" />
-                {isCompareMode ? '분석 결과 비교' : '분석 결과 상세'}
+                {isCompareMode ? "분석 결과 비교" : "분석 결과 상세"}
               </DialogTitle>
               <div className="flex items-center gap-2">
                 {/* ✅ 세로로만 확대하는 버튼 */}
@@ -2700,7 +3316,11 @@ const ResultDetail = ({
                   className="transition-all duration-200 hover:scale-110 hover:bg-accent"
                   title={isFullscreen ? "원래 크기로 (ESC)" : "최대화 (F11)"}
                 >
-                  {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  {isFullscreen ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
                 </Button>
                 {/* ❌ 커스텀 닫기 버튼 제거: DialogContent 기본 X만 사용 */}
               </div>
@@ -2708,14 +3328,15 @@ const ResultDetail = ({
             <DialogDescription className="sr-only">
               {isCompareMode
                 ? `${processedResults.length}개의 분석 결과를 비교하고 알고리즘 분석 결과를 확인할 수 있습니다.`
-                : '단일 분석 결과의 상세 정보를 확인하고 Choi 알고리즘, 마할라노비스 거리, PEG 비교 분석 결과를 확인할 수 있습니다.'
-              }
+                : "단일 분석 결과의 상세 정보를 확인하고 Choi 알고리즘, 마할라노비스 거리, PEG 비교 분석 결과를 확인할 수 있습니다."}
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className={`transition-all duration-300 overflow-hidden ${
-            isFullscreen ? 'h-[85vh]' : 'max-h-[75vh] min-h-[400px]'
-          }`}>
+          <ScrollArea
+            className={`transition-all duration-300 overflow-hidden ${
+              isFullscreen ? "h-[85vh]" : "max-h-[75vh] min-h-[400px]"
+            }`}
+          >
             <div className="px-1 w-full max-w-full overflow-hidden">
               {renderContent()}
             </div>
@@ -2733,15 +3354,12 @@ const ResultDetail = ({
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
-            <div className="p-4">
-              {renderHelpContent()}
-            </div>
+            <div className="p-4">{renderHelpContent()}</div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
     </>
-  )
-}
+  );
+};
 
-export default memo(ResultDetail)
-
+export default memo(ResultDetail);
