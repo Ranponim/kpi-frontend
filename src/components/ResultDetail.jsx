@@ -106,6 +106,9 @@ const ResultDetail = ({
   const [mahalanobisResult, setMahalanobisResult] = useState(null); // 마할라노비스 거리 결과
   const [pegComparisonResult, setPegComparisonResult] = useState(null); // PEG 비교 결과
 
+  const [choiLoading, setChoiLoading] = useState(false);
+  const [choiData, setChoiData] = useState(null);
+
   // === 도움말 모달 상태 ===
   const [helpModal, setHelpModal] = useState({
     isOpen: false,
@@ -2106,43 +2109,167 @@ const ResultDetail = ({
             <CardTitle className="flex items-center gap-2">
               <Brain className="h-5 w-5 text-purple-600" />
               Choi 알고리즘 판정 결과
-              <Badge variant="outline" className="text-purple-600">
-                준비 중
-              </Badge>
+              {choiData ? (
+                <Badge variant="outline" className="text-purple-600">
+                  완료
+                </Badge>
+              ) : choiLoading ? (
+                <Badge variant="outline" className="text-purple-600">
+                  실행 중
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-purple-600">
+                  대기
+                </Badge>
+              )}
             </CardTitle>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleShowHelp("choi")}
-            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-          >
-            <HelpCircle className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {!choiLoading && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    setChoiLoading(true);
+                    setChoiAlgorithmResult("running");
+                    // 기본 파라미터 구성: 결과 내 메타에서 유추하거나 기본값 사용
+                    const first = processedResults?.[0];
+                    const cellIds = (first?.stats || [])
+                      .map((s) => s?.cell_id)
+                      .filter(Boolean)
+                      .slice(0, 5);
+                    const payload = {
+                      input_data: {},
+                      cell_ids: cellIds.length
+                        ? Array.from(new Set(cellIds))
+                        : ["cell_001"],
+                      time_range: {
+                        pre_start: new Date(
+                          Date.now() - 2 * 60 * 60 * 1000
+                        ).toISOString(),
+                        pre_end: new Date(
+                          Date.now() - 60 * 60 * 1000
+                        ).toISOString(),
+                        post_start: new Date(
+                          Date.now() - 30 * 60 * 1000
+                        ).toISOString(),
+                        post_end: new Date().toISOString(),
+                      },
+                      compare_mode: true,
+                    };
+                    const res = await runChoiAnalysis(payload);
+                    // 응답에서 choi_judgement 우선 확보
+                    const choi = res?.kpi_judgement
+                      ? {
+                          overall: res.kpi_judgement.overall,
+                          reasons: res.kpi_judgement.reasons || [],
+                          by_kpi: res.kpi_judgement.by_kpi || {},
+                          warnings: res.processing_warnings || [],
+                        }
+                      : res?.peg_analysis?.choi_judgement || null;
+                    setChoiData(choi);
+                    setChoiAlgorithmResult("done");
+                  } catch (e) {
+                    console.error("Choi 분석 실패", e);
+                    setChoiAlgorithmResult("error");
+                  } finally {
+                    setChoiLoading(false);
+                  }
+                }}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50"
+              >
+                {choiData ? "재실행" : "분석 실행"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleShowHelp("choi")}
+              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <CardDescription>
           Choi 알고리즘 문서 기반의 품질 판정 결과를 표시합니다.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-center py-8">
-          <div className="relative mb-4">
-            <Brain className="h-12 w-12 text-purple-400 mx-auto" />
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full animate-pulse"></div>
+        {choiLoading && (
+          <div className="flex items-center justify-center gap-2 py-6">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <p className="text-muted-foreground">분석 실행 중...</p>
           </div>
-          <h3 className="text-lg font-semibold mb-2">알고리즘 구현 준비 중</h3>
-          <p className="text-muted-foreground mb-4">
-            Choi 알고리즘 문서에 의한 판정 결과가 여기에 표시됩니다.
-          </p>
-          <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-            <p className="text-purple-800 dark:text-purple-200 text-sm">
-              <strong>현재 상태:</strong> {choiAlgorithmResult}
-            </p>
-            <p className="text-purple-600 dark:text-purple-300 text-xs mt-2">
-              향후 Choi 알고리즘 구현 시 이 영역에 결과가 표시됩니다.
-            </p>
+        )}
+        {!choiLoading && choiData && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">전체 판정</span>
+              <Badge variant="outline" className="text-purple-700">
+                {choiData.overall || "N/A"}
+              </Badge>
+            </div>
+            {Array.isArray(choiData.reasons) && choiData.reasons.length > 0 && (
+              <div>
+                <div className="text-sm font-medium mb-2">사유</div>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground">
+                  {choiData.reasons.map((r, idx) => (
+                    <li key={idx}>
+                      {typeof r === "string" ? r : JSON.stringify(r)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {choiData.by_kpi && Object.keys(choiData.by_kpi).length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="px-2 py-1">KPI</th>
+                      <th className="px-2 py-1">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(choiData.by_kpi).map(([k, v]) => (
+                      <tr key={k} className="border-t">
+                        <td className="px-2 py-1 whitespace-nowrap">{k}</td>
+                        <td className="px-2 py-1">
+                          {(v && v.status) || "N/A"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {Array.isArray(choiData.warnings) &&
+              choiData.warnings.length > 0 && (
+                <div className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
+                  경고: {choiData.warnings.join(", ")}
+                </div>
+              )}
           </div>
-        </div>
+        )}
+        {!choiLoading && !choiData && (
+          <div className="text-center py-8">
+            <div className="relative mb-4">
+              <Brain className="h-12 w-12 text-purple-400 mx-auto" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full animate-pulse"></div>
+            </div>
+            <h3 className="text-lg font-semibold mb-2">알고리즘 실행 대기</h3>
+            <p className="text-muted-foreground mb-4">
+              버튼을 눌러 Choi 알고리즘 판정을 실행하세요.
+            </p>
+            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+              <p className="text-purple-800 dark:text-purple-200 text-sm">
+                <strong>현재 상태:</strong> {choiAlgorithmResult}
+              </p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
