@@ -8,8 +8,13 @@ RUN npm config set fund false && \
 
 # npm 우선 사용 (package-lock.json 존재 시)
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; \
-    else npm i; fi
+RUN if [ -f package-lock.json ]; then \
+        if npm ci; then echo "npm ci completed"; \
+        else echo "npm ci failed, falling back to npm i for musl optional deps"; rm -rf node_modules package-lock.json && npm i; \
+        fi; \
+    else \
+        npm i; \
+    fi
 
 # === 빌드 스테이지 ===
 FROM node:20-alpine AS build
