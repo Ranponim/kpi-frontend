@@ -18,6 +18,9 @@
 
 import axios from "axios";
 import { toast } from "sonner";
+// TypeScript 타입 import (JSDoc에서 사용)
+// @ts-ignore - JS 파일에서 TS 타입 import
+import { AnalysisResult } from "../types";
 
 // ================================
 // 로깅 유틸리티
@@ -554,6 +557,92 @@ export const testDatabaseConnection = async (dbConfig) => {
       success: false,
       error: getErrorMessage(error),
     };
+  }
+};
+
+/**
+ * 상세 분석 결과를 조회합니다
+ * 모든 분석 타입(LLM, Choi, 마할라노비스, PEG)의 통합 결과를 반환합니다
+ *
+ * @param {string} id - 분석 결과 ID
+ * @returns {Promise<AnalysisResult>} 상세 분석 결과
+ */
+export const getDetailedResult = async (id) => {
+  logApiClient("info", "상세 분석 결과 조회 시작", { resultId: id });
+
+  try {
+    // 입력 검증
+    if (!id || typeof id !== "string" || id.trim().length === 0) {
+      throw new Error("유효하지 않은 분석 결과 ID입니다.");
+    }
+
+    const response = await apiClient.get(`/api/results/${id}/detailed`);
+
+    // 응답 데이터 검증
+    if (!response.data) {
+      throw new Error("분석 결과 데이터가 없습니다.");
+    }
+
+    const analysisResult = response.data;
+
+    // 기본 구조 검증
+    if (!analysisResult.id) {
+      logApiClient("warn", "응답에 ID가 없어 요청 ID로 설정", {
+        requestId: id,
+      });
+      analysisResult.id = id;
+    }
+
+    if (!analysisResult.timestamp) {
+      logApiClient("warn", "응답에 timestamp가 없어 현재 시간으로 설정");
+      analysisResult.timestamp = new Date().toISOString();
+    }
+
+    // 각 분석 타입별 데이터 정규화
+    if (analysisResult.llmAnalysis) {
+      logApiClient("debug", "LLM 분석 데이터 확인됨");
+    }
+
+    if (analysisResult.choiAnalysis) {
+      logApiClient("debug", "Choi 알고리즘 분석 데이터 확인됨");
+    }
+
+    if (analysisResult.mahalanobisAnalysis) {
+      logApiClient("debug", "마할라노비스 분석 데이터 확인됨");
+    }
+
+    if (analysisResult.pegAnalysis) {
+      logApiClient("debug", "PEG 분석 데이터 확인됨");
+    }
+
+    logApiClient("info", "상세 분석 결과 조회 성공", {
+      resultId: id,
+      hasLlm: !!analysisResult.llmAnalysis,
+      hasChoi: !!analysisResult.choiAnalysis,
+      hasMahalanobis: !!analysisResult.mahalanobisAnalysis,
+      hasPeg: !!analysisResult.pegAnalysis,
+    });
+
+    return analysisResult;
+  } catch (error) {
+    const errorMessage = getErrorMessage(error);
+
+    logApiClient("error", "상세 분석 결과 조회 실패", {
+      resultId: id,
+      error: errorMessage,
+      status: error?.response?.status,
+    });
+
+    // 사용자 친화적인 에러 메시지
+    if (error?.response?.status === 404) {
+      throw new Error(`분석 결과를 찾을 수 없습니다. (ID: ${id})`);
+    } else if (error?.response?.status === 403) {
+      throw new Error("분석 결과에 접근할 권한이 없습니다.");
+    } else if (error?.response?.status >= 500) {
+      throw new Error("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    throw error;
   }
 };
 

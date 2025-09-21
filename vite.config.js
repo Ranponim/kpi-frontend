@@ -1,8 +1,8 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-import { visualizer } from 'rollup-plugin-visualizer'
-import path from 'path'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { visualizer } from "rollup-plugin-visualizer";
+import path from "path";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -10,40 +10,47 @@ export default defineConfig({
     react(),
     tailwindcss(),
     // 번들 분석기 (분석 모드에서만 활성화)
-    process.env.ANALYZE && visualizer({
-      filename: 'dist/bundle-analysis.html',
-      open: true,
-      gzipSize: true,
-      brotliSize: true,
-    })
+    process.env.ANALYZE &&
+      visualizer({
+        filename: "dist/bundle-analysis.html",
+        open: true,
+        gzipSize: true,
+        brotliSize: true,
+      }),
   ].filter(Boolean),
 
   // API 프록시 설정 - 환경변수 우선 사용
   server: {
     proxy: {
-      '/api': {
-        target: process.env.VITE_API_BASE_URL || 'http://165.213.69.30:8000',
+      "/api": {
+        target: process.env.VITE_API_BASE_URL || "http://165.213.69.30:8000",
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/api'),
+        rewrite: (path) => path.replace(/^\/api/, "/api"),
         configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.log('proxy error', err);
+          proxy.on("error", (err, req, res) => {
+            console.log("proxy error", err);
           });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('Sending Request to the Target:', req.method, req.url);
+          proxy.on("proxyReq", (proxyReq, req, res) => {
+            console.log("Sending Request to the Target:", req.method, req.url);
           });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          proxy.on("proxyRes", (proxyRes, req, res) => {
+            console.log(
+              "Received Response from the Target:",
+              proxyRes.statusCode,
+              req.url
+            );
           });
         },
-      }
-    }
+      },
+    },
   },
 
   // 환경변수 설정
   define: {
     // Docker 환경에서 사용할 기본 API URL
-    __DOCKER_API_BASE_URL__: JSON.stringify(process.env.VITE_API_BASE_URL || 'http://165.213.69.30:8000/api'),
+    __DOCKER_API_BASE_URL__: JSON.stringify(
+      process.env.VITE_API_BASE_URL || "http://165.213.69.30:8000/api"
+    ),
   },
   resolve: {
     alias: {
@@ -58,64 +65,77 @@ export default defineConfig({
         // 수동 청크 분할 설정 (React 안전하게 처리)
         manualChunks: (id) => {
           // 큰 페이지 컴포넌트들을 별도 청크로 분리 (코드 스플리팅)
-          if (id.includes('/src/components/Dashboard')) {
-            return 'dashboard-page';
+          if (id.includes("/src/components/Dashboard")) {
+            return "dashboard-page";
           }
-          if (id.includes('/src/components/Statistics')) {
-            return 'statistics-page';
+          if (id.includes("/src/components/Statistics")) {
+            return "statistics-page";
           }
-          if (id.includes('/src/components/LLMAnalysisManager')) {
-            return 'llm-analysis-page';
+          if (id.includes("/src/components/LLMAnalysisManager")) {
+            return "llm-analysis-page";
           }
-          if (id.includes('/src/components/PreferenceManager')) {
-            return 'preference-page';
+          if (id.includes("/src/components/PreferenceManager")) {
+            return "preference-page";
           }
-          if (id.includes('/src/components/ResultsList')) {
-            return 'results-page';
+          if (id.includes("/src/components/ResultsList")) {
+            return "results-page";
           }
 
           // 공통 컴포넌트들을 별도 청크로 분리
-          if (id.includes('/src/components/common/')) {
-            return 'common-components';
+          if (id.includes("/src/components/common/")) {
+            return "common-components";
           }
 
           // Recharts 차트 라이브러리 (큰 청크를 분할)
-          if (id.includes('recharts')) {
-            return 'chart-vendor';
+          if (id.includes("recharts")) {
+            return "chart-vendor";
           }
 
           // Radix UI 라이브러리들 (UI 컴포넌트)
-          if (id.includes('@radix-ui')) {
-            return 'ui-vendor';
+          if (id.includes("@radix-ui")) {
+            return "ui-vendor";
           }
 
           // Lucide React 아이콘들
-          if (id.includes('lucide-react')) {
-            return 'icon-vendor';
+          if (id.includes("lucide-react")) {
+            return "icon-vendor";
           }
 
           // 유틸리티 라이브러리들
-          if (id.includes('date-fns') || id.includes('lodash') || id.includes('clsx') || id.includes('class-variance-authority')) {
-            return 'utils-vendor';
+          if (
+            id.includes("date-fns") ||
+            id.includes("lodash") ||
+            id.includes("clsx") ||
+            id.includes("class-variance-authority")
+          ) {
+            return "utils-vendor";
           }
 
           // 폼 관련 라이브러리들
-          if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
-            return 'form-vendor';
+          if (
+            id.includes("react-hook-form") ||
+            id.includes("@hookform") ||
+            id.includes("zod")
+          ) {
+            return "form-vendor";
           }
 
           // 애니메이션 라이브러리
-          if (id.includes('framer-motion')) {
-            return 'animation-vendor';
+          if (id.includes("framer-motion")) {
+            return "animation-vendor";
           }
 
           // React와 React-DOM은 vendor 청크에 함께 포함 (분리하지 않음)
           // Node modules를 별도로 분리
-          if (id.includes('node_modules')) {
-            return 'vendor';
+          if (id.includes("node_modules")) {
+            return "vendor";
           }
-        }
-      }
-    }
-  }
-})
+        },
+      },
+    },
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./vitest.setup.ts"],
+  },
+});

@@ -87,7 +87,12 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
-import apiClient from "@/lib/apiClient.js";
+import apiClient, { getDetailedResult } from "@/lib/apiClient.js";
+import AnalysisSection from "./AnalysisSection.jsx";
+import AnalysisStatusIndicator from "./AnalysisStatusIndicator.jsx";
+import PEGAnalysisDisplay from "./PEGAnalysisDisplay.jsx";
+import { useDashboardSettings } from "@/hooks/usePreference.js";
+import usePegPreferences from "@/hooks/usePegPreferences.ts";
 
 const ResultDetail = ({
   isOpen,
@@ -135,9 +140,23 @@ const ResultDetail = ({
   // === PEG 차트 제어 상태 ===
   const [pegPage, setPegPage] = useState(0);
   const [pegPageSize, setPegPageSize] = useState(10);
-  const [pegFilter, setPegFilter] = useState("");
+  const [pegFilter, setPegFilter] = useState(
+    dashboardSettings?.pegSearch || ""
+  );
   const [weightFilter, setWeightFilter] = useState("all"); // all, high(>=8), medium(6-7.9), low(<6)
   const [trendFilter, setTrendFilter] = useState("all"); // all, up, down, stable
+  const [pegSort, setPegSort] = useState(
+    dashboardSettings?.pegSort || "weight_desc"
+  );
+  // Preference 기반 선택 PEG
+  const {
+    settings: dashboardSettings,
+    updateSettings: updateDashboardSettings,
+  } = useDashboardSettings() || {
+    settings: { selectedPegs: [], pegSearch: "", pegSort: "weight_desc" },
+    updateSettings: () => {},
+  };
+  const { preferredPegs, setPreferredPegs } = usePegPreferences();
 
   // === 메모리 최적화: 큰 데이터 청크 단위 처리 ===
   const [dataChunkSize] = useState(50); // 한 번에 처리할 데이터 청크 크기
@@ -233,31 +252,17 @@ const ResultDetail = ({
             while (retryCount <= maxRetries) {
               try {
                 // URL 인코딩으로 안전한 요청 보장
-                const encodedId = encodeURIComponent(id);
-                const requestUrl = `/api/analysis/results/${encodedId}`;
-
-                console.log(`🌐 API 요청: ${requestUrl} (원본 ID: ${id})`);
-
-                const response = await apiClient.get(requestUrl, {
-                  signal,
-                  timeout: 10000, // 10초 타임아웃
-                  headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                  },
-                });
-
-                // 응답 데이터 검증
-                if (!response.data) {
+                console.log(`🌐 API 요청(getDetailedResult): ${id}`);
+                const data = await getDetailedResult(id);
+                if (!data) {
                   throw new Error("서버에서 빈 응답을 반환했습니다.");
                 }
-
                 console.log(
                   `✅ 결과 ${id} 로딩 성공 (시도 ${retryCount + 1}/${
                     maxRetries + 1
                   })`
                 );
-                return { ...response.data, id };
+                return { ...data, id };
               } catch (err) {
                 lastError = err;
 
@@ -1078,9 +1083,25 @@ const ResultDetail = ({
     const kpiResults = Object.values(pegComparison).filter(
       (peg) => peg["N-1"] !== undefined && peg["N"] !== undefined
     );
-    const sortedKpiResults = [...kpiResults].sort(
-      (a, b) => (b.weight || 0) - (a.weight || 0)
-    );
+    // 정렬 로직: Preference 기반
+    const sortKey = pegSort;
+    const sortedKpiResults = [...kpiResults].sort((a, b) => {
+      switch (sortKey) {
+        case "weight_asc":
+          return (a.weight || 0) - (b.weight || 0);
+        case "change_desc":
+          return (b.change_percent || 0) - (a.change_percent || 0);
+        case "change_asc":
+          return (a.change_percent || 0) - (b.change_percent || 0);
+        case "name_asc":
+          return String(a.peg_name).localeCompare(String(b.peg_name));
+        case "name_desc":
+          return String(b.peg_name).localeCompare(String(a.peg_name));
+        case "weight_desc":
+        default:
+          return (b.weight || 0) - (a.weight || 0);
+      }
+    });
 
     const filteredResults = sortedKpiResults.filter((item) => {
       const matchesNameFilter =
@@ -1272,7 +1293,10 @@ const ResultDetail = ({
                 placeholder="PEG 이름 검색..."
                 value={pegFilter}
                 onChange={(e) => {
-                  setPegFilter(e.target.value);
+                  const v = e.target.value;
+                  setPegFilter(v);
+                  // Preference 저장
+                  updateDashboardSettings({ pegSearch: v });
                   setPegPage(0); // 검색 시 첫 페이지로
                 }}
                 className="pl-8"
@@ -1315,6 +1339,28 @@ const ResultDetail = ({
                 <SelectItem value="up">개선 📈</SelectItem>
                 <SelectItem value="down">하락 📉</SelectItem>
                 <SelectItem value="stable">안정 ➡️</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* 정렬 선택 */}
+            <Select
+              value={pegSort}
+              onValueChange={(value) => {
+                setPegSort(value);
+                updateDashboardSettings({ pegSort: value });
+                setPegPage(0);
+              }}
+            >
+              <SelectTrigger className="w-[165px]">
+                <SelectValue placeholder="정렬" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weight_desc">가중치 ↓</SelectItem>
+                <SelectItem value="weight_asc">가중치 ↑</SelectItem>
+                <SelectItem value="change_desc">변화율 ↓</SelectItem>
+                <SelectItem value="change_asc">변화율 ↑</SelectItem>
+                <SelectItem value="name_asc">이름 A→Z</SelectItem>
+                <SelectItem value="name_desc">이름 Z→A</SelectItem>
               </SelectContent>
             </Select>
 
@@ -2766,21 +2812,79 @@ const ResultDetail = ({
     return (
       <Card className="border-l-4 border-l-green-500">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-green-600" />
                 PEG 성능 비교 분석
               </CardTitle>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleShowHelp("peg-comparison")}
-              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-            >
-              <HelpCircle className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {(() => {
+                const visibleNames = (pegComparisonResult || [])
+                  .filter((p) => {
+                    const matchesName =
+                      !pegFilter ||
+                      String(p.peg_name)
+                        .toLowerCase()
+                        .includes(pegFilter.toLowerCase());
+                    const weight = p.weight || 0;
+                    const matchesWeight =
+                      weightFilter === "all"
+                        ? true
+                        : weightFilter === "high"
+                        ? weight >= 8
+                        : weightFilter === "medium"
+                        ? weight >= 6 && weight < 8
+                        : weightFilter === "low"
+                        ? weight < 6
+                        : true;
+                    const matchesTrend =
+                      trendFilter === "all" ? true : p.trend === trendFilter;
+                    return matchesName && matchesWeight && matchesTrend;
+                  })
+                  .map((p) => p.peg_name);
+
+                const total = pegComparisonResult?.length || 0;
+                const selCount = preferredPegs.length;
+
+                return (
+                  <>
+                    <Badge variant="outline" className="text-xs">
+                      선택 {selCount} / 총 {total}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setPreferredPegs(
+                          Array.from(
+                            new Set([...(preferredPegs || []), ...visibleNames])
+                          )
+                        )
+                      }
+                    >
+                      선택 모두
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPreferredPegs([])}
+                    >
+                      선택 해제
+                    </Button>
+                  </>
+                );
+              })()}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleShowHelp("peg-comparison")}
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <CardDescription>
             N-1 기간과 N 기간의 PEG별 평균, RSD, 변화율 비교
@@ -2789,26 +2893,28 @@ const ResultDetail = ({
         <CardContent className="space-y-6">
           {/* 요약 통계 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <div className="text-lg font-bold text-blue-600">
+            <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
+              <div className="text-lg font-bold text-blue-600 dark:text-blue-300">
                 {pegComparisonResult.length}
               </div>
-              <div className="text-xs text-muted-foreground">총 PEG 수</div>
+              <div className="text-xs text-muted-foreground dark:text-muted-foreground/80">
+                총 PEG 수
+              </div>
             </div>
-            <div className="text-center p-3 bg-green-50 rounded-lg">
-              <div className="text-lg font-bold text-green-600">
+            <div className="text-center p-3 bg-green-50 dark:bg-green-950/40 rounded-lg">
+              <div className="text-lg font-bold text-green-600 dark:text-green-300">
                 {pegComparisonResult.filter((p) => p.trend === "up").length}
               </div>
               <div className="text-xs text-muted-foreground">개선 PEG</div>
             </div>
-            <div className="text-center p-3 bg-red-50 rounded-lg">
-              <div className="text-lg font-bold text-red-600">
+            <div className="text-center p-3 bg-red-50 dark:bg-red-950/40 rounded-lg">
+              <div className="text-lg font-bold text-red-600 dark:text-red-300">
                 {pegComparisonResult.filter((p) => p.trend === "down").length}
               </div>
               <div className="text-xs text-muted-foreground">하락 PEG</div>
             </div>
-            <div className="text-center p-3 bg-gray-50 rounded-lg">
-              <div className="text-lg font-bold text-gray-600">
+            <div className="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+              <div className="text-lg font-bold text-gray-600 dark:text-gray-300">
                 {pegComparisonResult.filter((p) => p.trend === "stable").length}
               </div>
               <div className="text-xs text-muted-foreground">안정 PEG</div>
@@ -2824,9 +2930,10 @@ const ResultDetail = ({
             <div className="border rounded-lg overflow-hidden">
               <div className="max-h-96 overflow-y-auto">
                 <table className="w-full">
-                  <thead className="bg-muted/50 sticky top-0">
+                  <thead className="bg-muted/50 dark:bg-muted/20 sticky top-0">
                     <tr className="text-left text-sm font-medium">
                       <th className="p-3">PEG 이름</th>
+                      <th className="p-3 text-center">선택</th>
                       <th className="p-3 text-center">가중치</th>
                       <th className="p-3 text-center">N-1 평균</th>
                       <th className="p-3 text-center">N 평균</th>
@@ -2837,9 +2944,31 @@ const ResultDetail = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {pegComparisonResult.map((peg, idx) => (
+                    {(Array.isArray(dashboardSettings?.selectedPegs) &&
+                    dashboardSettings.selectedPegs.length > 0
+                      ? pegComparisonResult.filter((p) =>
+                          dashboardSettings.selectedPegs.includes(p.peg_name)
+                        )
+                      : pegComparisonResult
+                    ).map((peg, idx) => (
                       <tr key={idx} className="border-t hover:bg-muted/30">
                         <td className="p-3 font-medium">{peg.peg_name}</td>
+                        <td className="p-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={preferredPegs.includes(peg.peg_name)}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? Array.from(
+                                    new Set([...preferredPegs, peg.peg_name])
+                                  )
+                                : preferredPegs.filter(
+                                    (n) => n !== peg.peg_name
+                                  );
+                              setPreferredPegs(next);
+                            }}
+                          />
+                        </td>
                         <td className="p-3 text-center">
                           <Badge variant="outline">{peg.weight}</Badge>
                         </td>
@@ -2916,10 +3045,23 @@ const ResultDetail = ({
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">분석 결과를 불러오는 중...</p>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <p className="text-muted-foreground dark:text-muted-foreground/80">
+              분석 결과를 불러오는 중...
+            </p>
+          </div>
+          <div className="grid gap-4">
+            <div className="bg-card/40 dark:bg-card/20 border rounded-lg p-4">
+              <div className="h-5 w-48 bg-accent/60 dark:bg-accent/30 animate-pulse rounded mb-3" />
+              <div className="h-4 w-full bg-accent/60 dark:bg-accent/30 animate-pulse rounded mb-2" />
+              <div className="h-4 w-5/6 bg-accent/60 dark:bg-accent/30 animate-pulse rounded" />
+            </div>
+            <div className="bg-card/40 dark:bg-card/20 border rounded-lg p-4">
+              <div className="h-5 w-56 bg-accent/60 dark:bg-accent/30 animate-pulse rounded mb-3" />
+              <div className="h-48 w-full bg-accent/60 dark:bg-accent/30 animate-pulse rounded" />
+            </div>
           </div>
         </div>
       );
@@ -2927,18 +3069,23 @@ const ResultDetail = ({
 
     if (error) {
       return (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">데이터 로딩 오류</h3>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button
-              onClick={() => fetchResultDetails(resultIds)}
-              variant="outline"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              다시 시도
-            </Button>
+        <div className="max-w-xl mx-auto">
+          <div className="border rounded-lg p-6 bg-background dark:bg-background/60">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+              <div className="space-y-2">
+                <h4 className="font-semibold">데이터를 불러오지 못했습니다</h4>
+                <p className="text-sm text-muted-foreground">{error}</p>
+                <div className="pt-1">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchResultDetails(resultIds)}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" /> 다시 시도
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -2966,31 +3113,54 @@ const ResultDetail = ({
             : renderSingleOverview(processedResults[0])}
         </div>
 
-        {/* 알고리즘 결과 섹션 */}
-        <div className="space-y-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-semibold">알고리즘 분석 결과</h3>
-          </div>
-
-          {/* Choi 알고리즘 결과 */}
-          {renderChoiAlgorithmResult()}
-
-          {/* 마할라노비스 거리 분석 */}
-          {renderMahalanobisResult()}
-
-          {/* PEG 비교 분석 */}
-          {renderPegComparisonResult()}
-        </div>
-
-        {/* LLM 분석 리포트 */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Brain className="h-5 w-5 text-primary" />
-            <h3 className="text-xl font-semibold">LLM 분석 리포트</h3>
-          </div>
+        {/* LLM 분석 리포트 (최우선) */}
+        <AnalysisSection
+          title="LLM 분석 리포트"
+          defaultOpen
+          data-testid="section-llm"
+        >
           {renderLLMReport(processedResults)}
-        </div>
+        </AnalysisSection>
+
+        {/* Choi 알고리즘 결과 */}
+        {choiData && (
+          <AnalysisSection
+            title={
+              <span className="inline-flex items-center gap-2">
+                Choi 알고리즘 판정
+                {choiData?.overall && (
+                  <AnalysisStatusIndicator status={choiData.overall} />
+                )}
+              </span>
+            }
+            defaultOpen
+            data-testid="section-choi"
+          >
+            {renderChoiAlgorithmResult()}
+          </AnalysisSection>
+        )}
+
+        {/* 마할라노비스 거리 분석 */}
+        {mahalanobisResult && (
+          <AnalysisSection
+            title="마할라노비스 분석"
+            defaultOpen
+            data-testid="section-mahalanobis"
+          >
+            {renderMahalanobisResult()}
+          </AnalysisSection>
+        )}
+
+        {/* PEG 비교 분석 (Preference 연동 예정) */}
+        {pegComparisonResult && (
+          <AnalysisSection
+            title="PEG 비교 분석"
+            defaultOpen
+            data-testid="section-peg"
+          >
+            <PEGAnalysisDisplay results={pegComparisonResult} />
+          </AnalysisSection>
+        )}
       </div>
     );
   };
