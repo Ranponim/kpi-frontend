@@ -6,10 +6,9 @@ WORKDIR /app
 RUN npm config set fund false && \
     npm config set audit-level high
 
-# npm 우선 사용 (package-lock.json 존재 시)
-COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; \
-    else npm i; fi
+# pnpm 사용 (pnpm-lock.yaml 기반)
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
 
 # === 빌드 스테이지 ===
 FROM node:20-alpine AS build
@@ -26,12 +25,8 @@ COPY . .
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# 빌드 실행
-RUN if [ -f pnpm-lock.yaml ]; then \
-        npm i -g pnpm && pnpm run build; \
-    else \
-        npm run build; \
-    fi
+# 빌드 실행 (의존성은 이미 deps 스테이지에서 설치됨)
+RUN npm install -g pnpm && pnpm run build
 
 # === 개발용 런타임 ===
 FROM nginx:1.27-alpine AS runtime
