@@ -1,27 +1,21 @@
 # === 의존성 설치 ===
-FROM node:20-alpine AS deps
+FROM node:20-bullseye AS deps
 WORKDIR /app
 
 # 보안 및 성능을 위한 패키지 관리자 설정
 RUN npm config set fund false && \
     npm config set audit-level high
 
-# npm 우선 사용 (package-lock.json 존재 시)
+# npm 설치 (플랫폼별 optional deps 정확 설치를 위해 npm i 사용)
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then \
-        if npm ci; then echo "npm ci completed"; \
-        else echo "npm ci failed, falling back to npm i for musl optional deps"; rm -rf node_modules package-lock.json && npm i; \
-        fi; \
-    else \
-        npm i; \
-    fi
+RUN npm i
 
 # === 빌드 스테이지 ===
-FROM node:20-alpine AS build
+FROM node:20-bullseye AS build
 WORKDIR /app
 
 # 빌드 도구 설치
-RUN apk add --no-cache git
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
 # 의존성 복사 및 설치
 COPY --from=deps /app/node_modules ./node_modules
