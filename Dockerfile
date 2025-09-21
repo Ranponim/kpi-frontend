@@ -6,9 +6,9 @@ WORKDIR /app
 RUN npm config set fund false && \
     npm config set audit-level high
 
-# npm 설치 (플랫폼별 optional deps 정확 설치를 위해 npm i 사용)
-COPY package.json package-lock.json* ./
-RUN npm i
+# npm 설치 (플랫폼 전용 optional deps를 정확히 설치하기 위해 lock 무시)
+COPY package.json ./
+RUN rm -rf node_modules package-lock.json && npm i
 
 # === 빌드 스테이지 ===
 FROM node:20-bullseye AS build
