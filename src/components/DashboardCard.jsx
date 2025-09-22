@@ -21,40 +21,45 @@
  * - error: 에러 상태 (추가)
  */
 
-import React from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Badge } from '@/components/ui/badge.jsx'
-import DashboardChart from './DashboardChart.jsx'
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.jsx";
+import { Badge } from "@/components/ui/badge.jsx";
+import DashboardChart from "./DashboardChart.jsx";
 
 // 로깅 유틸리티
 const logDashboardCard = (level, message, data = null) => {
-  const timestamp = new Date().toISOString()
-  const prefix = `[DashboardCard:${timestamp}]`
-  
+  const timestamp = new Date().toISOString();
+  const prefix = `[DashboardCard:${timestamp}]`;
+
   switch (level) {
-    case 'info':
-      console.log(`${prefix} ${message}`, data)
-      break
-    case 'error':
-      console.error(`${prefix} ${message}`, data)
-      break
-    case 'warn':
-      console.warn(`${prefix} ${message}`, data)
-      break
-    case 'debug':
-      console.debug(`${prefix} ${message}`, data)
-      break
+    case "info":
+      console.log(`${prefix} ${message}`, data);
+      break;
+    case "error":
+      console.error(`${prefix} ${message}`, data);
+      break;
+    case "warn":
+      console.warn(`${prefix} ${message}`, data);
+      break;
+    case "debug":
+      console.debug(`${prefix} ${message}`, data);
+      break;
     default:
-      console.log(`${prefix} ${message}`, data)
+      console.log(`${prefix} ${message}`, data);
   }
-}
+};
 
 /**
  * PEG 제목 생성 함수
  * @param {string} chartKey - PEG 키
  * @returns {string} 표시할 제목
  */
-const titleFor = (title) => title
+const titleFor = (title) => title;
 
 const DashboardCard = ({
   chartKey,
@@ -69,9 +74,9 @@ const DashboardCard = ({
   onZoom,
   loading = false,
   onRefresh,
-  error = null
+  error = null,
 }) => {
-  logDashboardCard('debug', 'DashboardCard 렌더링', {
+  logDashboardCard("debug", "DashboardCard 렌더링", {
     chartKey,
     idx,
     title,
@@ -81,53 +86,74 @@ const DashboardCard = ({
     loading,
     hasError: !!error,
     enableTimeComparison,
-    chartDataType: Array.isArray(chartData) ? 'array' : typeof chartData,
-    chartDataSample: chartData?.length > 0 ? {
-      firstItem: {
-        time: chartData[0].time,
-        _isTime2: chartData[0]._isTime2,
-        entityCount: Object.keys(chartData[0]).filter(k => !k.startsWith('_')).length,
-        entities: Object.keys(chartData[0]).filter(k => !k.startsWith('_')),
-        allKeys: Object.keys(chartData[0])
-      },
-      totalItems: chartData.length,
-      // Time2 렌더링 문제 디버깅용
-      time1DataPoints: chartData.filter(d => !d._isTime2).length,
-      time2DataPoints: chartData.filter(d => d._isTime2).length,
-      time2SampleData: chartData.filter(d => d._isTime2).slice(0, 2).map(point => ({
-        time: point.time,
-        _isTime2: point._isTime2,
-        entities: Object.keys(point).filter(k => !k.startsWith('_')),
-        sampleValues: Object.keys(point)
-          .filter(k => !k.startsWith('_'))
-          .slice(0, 3)
-          .map(k => ({ key: k, value: point[k] }))
-      }))
-    } : null
-  })
+    chartDataType: Array.isArray(chartData) ? "array" : typeof chartData,
+    chartDataSample:
+      chartData?.length > 0
+        ? {
+            firstItem: {
+              time: chartData[0].time,
+              _isTime2: chartData[0]._isTime2,
+              entityCount: Object.keys(chartData[0]).filter(
+                (k) => !k.startsWith("_")
+              ).length,
+              entities: Object.keys(chartData[0]).filter(
+                (k) => !k.startsWith("_")
+              ),
+              allKeys: Object.keys(chartData[0]),
+            },
+            totalItems: chartData.length,
+            // Time2 렌더링 문제 디버깅용
+            time1DataPoints: chartData.filter((d) => !d._isTime2).length,
+            time2DataPoints: chartData.filter((d) => d._isTime2).length,
+            time2SampleData: chartData
+              .filter((d) => d._isTime2)
+              .slice(0, 2)
+              .map((point) => ({
+                time: point.time,
+                _isTime2: point._isTime2,
+                entities: Object.keys(point).filter((k) => !k.startsWith("_")),
+                sampleValues: Object.keys(point)
+                  .filter((k) => !k.startsWith("_"))
+                  .slice(0, 3)
+                  .map((k) => ({ key: k, value: point[k] })),
+              })),
+          }
+        : null,
+  });
 
   // 모든 데이터 포인트에서 엔티티 키를 수집 (Time1/Time2 모두 포함)
-  const entities = chartData?.length > 0 ? Array.from(
-    new Set(
-      chartData.flatMap(dataPoint =>
-        Object.keys(dataPoint).filter(k =>
-          k !== 'time' && k !== '_originalTime' && k !== '_isTime2'
+  const entities =
+    chartData?.length > 0
+      ? Array.from(
+          new Set(
+            chartData.flatMap((dataPoint) =>
+              Object.keys(dataPoint).filter(
+                (k) => k !== "time" && k !== "_originalTime" && k !== "_isTime2"
+              )
+            )
+          )
         )
-      )
-    )
-  ) : []
+      : [];
 
   // 로딩 중이거나 에러가 있을 때 카드 스타일 변경
-  const cardClassName = `w-full ${error ? 'border-destructive' : ''} ${loading ? 'opacity-75' : ''}`
+  const cardClassName = `w-full ${error ? "border-destructive" : ""} ${
+    loading ? "opacity-75" : ""
+  }`;
 
   return (
     <Card key={`${chartKey}-${idx}`} className={cardClassName}>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          {titleFor(title)}
+      {/* PEG명을 카드 상단에 고정 */}
+      <div className="px-6 py-3 border-b bg-muted/30">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-foreground">
+            {titleFor(title)}
+          </h3>
           <div className="flex items-center gap-2">
             {enableTimeComparison && (
-              <Badge variant="default" className="text-xs bg-blue-100 text-blue-800">
+              <Badge
+                variant="default"
+                className="text-xs bg-blue-100 text-blue-800"
+              >
                 Time1/Time2 비교
               </Badge>
             )}
@@ -138,12 +164,16 @@ const DashboardCard = ({
               {chartData?.length || 0}개 데이터포인트
             </Badge>
           </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div 
-          className="h-64 cursor-zoom-in" 
-          onClick={() => onZoom({ open: true, title: titleFor(title), data: chartData })}
+        </div>
+      </div>
+
+      {/* 차트 영역 - 최대한 크게 확장 */}
+      <CardContent className="p-0">
+        <div
+          className={`${enableTimeComparison ? "h-80" : "h-72"} cursor-zoom-in`}
+          onClick={() =>
+            onZoom({ open: true, title: titleFor(title), data: chartData })
+          }
         >
           <DashboardChart
             chartData={chartData}
@@ -160,8 +190,7 @@ const DashboardCard = ({
         </div>
       </CardContent>
     </Card>
-  )
-}
+  );
+};
 
-export default DashboardCard
-
+export default DashboardCard;

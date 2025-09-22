@@ -270,31 +270,13 @@ const DashboardChart = ({
 
   const chartProps = {
     data: chartData,
-    className: enableTimeComparison ? "h-80" : "h-64",
+    className: enableTimeComparison ? "h-80" : "h-72",
   };
 
-  // X축 틱 포맷터 - 날짜-시간 형식으로 표시
+  // X축 틱 포맷터 - 이미 포맷팅된 시간을 그대로 표시
   const xAxisTickFormatter = (value, index) => {
-    if (!enableTimeComparison) {
-      return value;
-    }
-
-    // 시간 비교 모드에서는 더 간결한 형식으로 표시
-    try {
-      // 날짜-시간 형식에서 시간 부분만 추출하여 표시
-      if (typeof value === "string" && value.includes(" ")) {
-        const [date, time] = value.split(" ");
-        // 시간 부분만 표시 (HH:MM 형식)
-        return time ? time.substring(0, 5) : value;
-      }
-      return value;
-    } catch (error) {
-      logDashboardChart("warn", "X축 틱 포맷팅 오류", {
-        value,
-        error: error.message,
-      });
-      return value;
-    }
+    // 시간 포맷팅은 이미 Dashboard.optimized.jsx에서 처리되었으므로 그대로 반환
+    return value;
   };
 
   const commonElements = [
