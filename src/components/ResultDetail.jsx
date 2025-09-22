@@ -807,17 +807,19 @@ const ResultDetail = ({
 
   // === 마할라노비스 거리 분석 수행 (성능 최적화 및 캐싱) ===
   const performMahalanobisAnalysis = useCallback(async () => {
-    if (!processedResults.length || !processedResults[0].stats) {
+    // 현재 results를 직접 참조하여 초기화 순서 문제 방지
+    const currentProcessedResults = results.filter((r) => !r.error);
+
+    if (!currentProcessedResults.length || !currentProcessedResults[0].stats) {
       console.log("📊 마할라노비스 분석: 데이터가 부족합니다");
       return;
     }
 
     // 성능 최적화: 동일한 데이터에 대한 중복 분석 방지
-    const resultId = processedResults[0].id;
-    const dataHash = btoa(JSON.stringify(processedResults[0].stats)).slice(
-      0,
-      16
-    );
+    const resultId = currentProcessedResults[0].id;
+    const dataHash = btoa(
+      JSON.stringify(currentProcessedResults[0].stats)
+    ).slice(0, 16);
 
     if (
       mahalanobisResult &&
@@ -835,7 +837,7 @@ const ResultDetail = ({
 
       // KPI 데이터 추출 (N-1과 N 기간 비교)
       const kpiData = {};
-      const statsData = processedResults[0].stats || [];
+      const statsData = currentProcessedResults[0].stats || [];
 
       statsData.forEach((stat) => {
         const kpiName = stat.kpi_name;
@@ -871,29 +873,35 @@ const ResultDetail = ({
         _cacheKey: `${resultId}-${dataHash}`,
       });
     }
-  }, [processedResults, calculateMahalanobisDistance, mahalanobisResult]);
+  }, [results, calculateMahalanobisDistance, mahalanobisResult]); // processedResults 대신 results 사용
 
   // === PEG 비교 분석 수행 ===
   const performPegComparisonAnalysis = useCallback(() => {
-    if (!processedResults.length || !processedResults[0].stats) {
+    // 현재 results를 직접 참조하여 초기화 순서 문제 방지
+    const currentProcessedResults = results.filter((r) => !r.error);
+
+    if (!currentProcessedResults.length || !currentProcessedResults[0].stats) {
       console.log("📊 PEG 비교 분석: 데이터가 부족합니다");
       return;
     }
 
     try {
       console.log("📊 PEG 비교 분석 시작");
-      const result = calculatePegComparison(processedResults[0]);
+      const result = calculatePegComparison(currentProcessedResults[0]);
       console.log("✅ PEG 비교 분석 완료:", result);
       setPegComparisonResult(result);
     } catch (error) {
       console.error("❌ PEG 비교 분석 실패:", error);
       setPegComparisonResult(null);
     }
-  }, [processedResults]);
+  }, [results]); // processedResults 대신 results 사용
 
   // === Effect: 데이터 로딩 완료 후 분석 수행 ===
   useEffect(() => {
-    if (processedResults.length > 0 && !loading) {
+    // 현재 results를 직접 참조하여 초기화 순서 문제 방지
+    const currentProcessedResults = results.filter((r) => !r.error);
+
+    if (currentProcessedResults.length > 0 && !loading) {
       console.log("🔬 데이터 로딩 완료, 분석 시작");
 
       // 마할라노비스 분석 수행 (비동기)
@@ -903,11 +911,11 @@ const ResultDetail = ({
       performPegComparisonAnalysis();
     }
   }, [
-    processedResults,
+    results,
     loading,
     performMahalanobisAnalysis,
     performPegComparisonAnalysis,
-  ]);
+  ]); // processedResults 대신 results 사용
 
   // === Effect: 모달이 닫힐 때 상태 정리 ===
   useEffect(() => {

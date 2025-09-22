@@ -289,7 +289,7 @@ export const useAnalysisResults = ({
     }));
   }, [logInfo]);
 
-  // === 페이지네이션 함수 ===
+  // === 페이지네이션 함수 (안전한 의존성) ===
   const loadMore = useCallback(async () => {
     if (loading || !hasMore) {
       logInfo("추가 로딩 건너뜀", { loading, hasMore });
@@ -298,14 +298,18 @@ export const useAnalysisResults = ({
 
     logInfo("추가 결과 로딩 시작");
     if (fetchResultsRef.current) {
+      // 현재 상태를 직접 참조하여 의존성 문제 방지
+      const currentSkip = pagination.skip;
+      const currentFilters = filters;
+
       await fetchResultsRef.current({
-        skip: pagination.skip,
+        skip: currentSkip,
         append: true,
         showToast: false,
-        currentFilters: filters, // 현재 필터 전달
+        currentFilters: currentFilters,
       });
     }
-  }, [loading, hasMore, pagination.skip, filters, logInfo]);
+  }, [loading, hasMore, logInfo]); // filters와 pagination.skip 제거
 
   const refresh = useCallback(async () => {
     logInfo("데이터 새로고침 시작");
@@ -316,13 +320,16 @@ export const useAnalysisResults = ({
     }));
 
     if (fetchResultsRef.current) {
+      // 현재 필터를 직접 참조하여 의존성 문제 방지
+      const currentFilters = filters;
+
       await fetchResultsRef.current({
         skip: 0,
         append: false,
-        currentFilters: filters, // 현재 필터 전달
+        currentFilters: currentFilters,
       });
     }
-  }, [filters, logInfo]);
+  }, [logInfo]); // filters 제거
 
   // === 특정 결과 삭제 ===
   const deleteResult = useCallback(
@@ -354,14 +361,16 @@ export const useAnalysisResults = ({
   useEffect(() => {
     if (autoFetch && isMountedRef.current && fetchResultsRef.current) {
       logInfo("컴포넌트 마운트 - 자동 데이터 조회 시작");
+      // 현재 필터를 직접 참조하여 의존성 문제 방지
+      const currentFilters = filters;
       fetchResultsRef.current({
         skip: 0,
         append: false,
         showToast: false,
-        currentFilters: filters,
+        currentFilters: currentFilters,
       });
     }
-  }, [autoFetch, logInfo, filters]); // fetchResults 의존성 제거
+  }, [autoFetch, logInfo]); // filters 의존성 제거
 
   // === 필터 변경 시 자동 재조회 (디바운스 적용) ===
   useEffect(() => {
