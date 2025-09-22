@@ -137,7 +137,21 @@ const ResultDetail = ({
     }
   }, [isOpen, isFullscreen]);
 
-  // === PEG 차트 제어 상태 ===
+  // === Preference 기반 선택 PEG (안전한 초기화) ===
+  const dashboardSettingsHook = useDashboardSettings();
+  const {
+    settings: dashboardSettings = {
+      selectedPegs: [],
+      pegSearch: "",
+      pegSort: "weight_desc",
+    },
+    updateSettings: updateDashboardSettings = () => {},
+  } = dashboardSettingsHook || {};
+
+  const { preferredPegs = [], setPreferredPegs = () => {} } =
+    usePegPreferences() || {};
+
+  // === PEG 차트 제어 상태 (안전한 초기화) ===
   const [pegPage, setPegPage] = useState(0);
   const [pegPageSize, setPegPageSize] = useState(10);
   const [pegFilter, setPegFilter] = useState(
@@ -148,15 +162,6 @@ const ResultDetail = ({
   const [pegSort, setPegSort] = useState(
     dashboardSettings?.pegSort || "weight_desc"
   );
-  // Preference 기반 선택 PEG
-  const {
-    settings: dashboardSettings,
-    updateSettings: updateDashboardSettings,
-  } = useDashboardSettings() || {
-    settings: { selectedPegs: [], pegSearch: "", pegSort: "weight_desc" },
-    updateSettings: () => {},
-  };
-  const { preferredPegs, setPreferredPegs } = usePegPreferences();
 
   // === 메모리 최적화: 큰 데이터 청크 단위 처리 ===
   const [dataChunkSize] = useState(50); // 한 번에 처리할 데이터 청크 크기

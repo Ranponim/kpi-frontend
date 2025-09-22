@@ -27,29 +27,29 @@ export const useAnalysisResults = ({
   initialFilters = {}
 } = {}) => {
   
-  // === 상태 관리 ===
+  // === 상태 관리 (안전한 초기화) ===
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [hasMore, setHasMore] = useState(true)
   
-  // 페이지네이션 상태
-  const [pagination, setPagination] = useState({
-    limit: initialLimit,
+  // 페이지네이션 상태 (안전한 초기화)
+  const [pagination, setPagination] = useState(() => ({
+    limit: initialLimit || 20,
     skip: 0,
     total: 0
-  })
+  }))
   
-  // 필터 상태
-  const [filters, setFilters] = useState({
+  // 필터 상태 (안전한 초기화)
+  const [filters, setFilters] = useState(() => ({
     // 필터 기본값을 빈 문자열로 설정 (사용자가 명시적으로 선택하도록)
     neId: '',
     cellId: '',
     startDate: null,
     endDate: null,
     status: '',
-    ...initialFilters
-  })
+    ...(initialFilters || {})
+  }))
   
   // === 로깅 함수 ===
   const logInfo = useCallback((message, data = {}) => {
@@ -67,13 +67,15 @@ export const useAnalysisResults = ({
   const abortControllerRef = useRef(null)
   const isMountedRef = useRef(true) // 컴포넌트 마운트 상태 추적
   const isRequestingRef = useRef(false) // 현재 요청 중인지 추적
+  const fetchResultsRef = useRef(null) // fetchResults 함수 참조
 
   // === API 호출 함수 ===
   const fetchResults = useCallback(async ({
     limit = pagination.limit,
     skip = 0,
     append = false,
-    showToast = true
+    showToast = true,
+    currentFilters = filters // 매개변수로 필터를 받도록 수정
   } = {}) => {
     try {
       // 컴포넌트가 언마운트된 경우 요청하지 않음
@@ -104,7 +106,7 @@ export const useAnalysisResults = ({
       setLoading(true)
       setError(null)
 
-      logInfo('분석 결과 조회 시작', { limit, skip, filters })
+      logInfo('분석 결과 조회 시작', { limit, skip, filters: currentFilters })
 
       // API 요청 파라미터 구성 (백엔드의 snake_case 쿼리 파라미터에 맞춤)
       const params = {
@@ -113,20 +115,20 @@ export const useAnalysisResults = ({
       }
       
       // 필터 조건 추가
-      if (filters.neId?.trim()) {
-        params.ne_id = filters.neId.trim()
+      if (currentFilters.neId?.trim()) {
+        params.ne_id = currentFilters.neId.trim()
       }
-      if (filters.cellId?.trim()) {
-        params.cell_id = filters.cellId.trim()
+      if (currentFilters.cellId?.trim()) {
+        params.cell_id = currentFilters.cellId.trim()
       }
-      if (filters.startDate) {
-        params.date_from = filters.startDate
+      if (currentFilters.startDate) {
+        params.date_from = currentFilters.startDate
       }
-      if (filters.endDate) {
-        params.date_to = filters.endDate
+      if (currentFilters.endDate) {
+        params.date_to = currentFilters.endDate
       }
-      if (filters.status?.trim()) {
-        params.status = filters.status.trim()
+      if (currentFilters.status?.trim()) {
+        params.status = currentFilters.status.trim()
       }
       
       // API 호출 (취소 신호 포함)
@@ -210,7 +212,10 @@ export const useAnalysisResults = ({
       isRequestingRef.current = false
       logInfo('요청 상태: 완료')
     }
-  }, [pagination.limit, JSON.stringify(filters), logInfo, logError])
+  }, [pagination.limit, logInfo, logError]) // JSON.stringify(filters) 제거
+
+  // fetchResults 함수 참조 업데이트
+  fetchResultsRef.current = fetchResults
 
   // === 필터 관리 함수 (디바운스 적용) ===
   const updateFilters = useCallback((newFilters, debounceMs = 1000) => {
@@ -276,12 +281,15 @@ export const useAnalysisResults = ({
     }
     
     logInfo('추가 결과 로딩 시작')
-    await fetchResults({ 
-      skip: pagination.skip, 
-      append: true,
-      showToast: false 
-    })
-  }, [loading, hasMore, fetchResults, pagination.skip, logInfo])
+    if (fetchResultsRef.current) {
+      await fetchResultsRef.current({ 
+        skip: pagination.skip, 
+        append: true,
+        showToast: false,
+        currentFilters: filters // 현재 필터 전달
+      })
+    }
+  }, [loading, hasMore, pagination.skip, filters, logInfo])
 
   const refresh = useCallback(async () => {
     logInfo('데이터 새로고침 시작')
@@ -291,8 +299,14 @@ export const useAnalysisResults = ({
       skip: 0
     }))
     
-    await fetchResults({ skip: 0, append: false })
-  }, [fetchResults, logInfo])
+    if (fetchResultsRef.current) {
+      await fetchResultsRef.current({ 
+        skip: 0, 
+        append: false,
+        currentFilters: filters // 현재 필터 전달
+      })
+    }
+  }, [filters, logInfo])
 
   // === 특정 결과 삭제 ===
   const deleteResult = useCallback(async (resultId) => {
@@ -319,19 +333,29 @@ export const useAnalysisResults = ({
 
   // === 자동 데이터 조회 (마운트 시) ===
   useEffect(() => {
-    if (autoFetch && isMountedRef.current) {
+    if (autoFetch && isMountedRef.current && fetchResultsRef.current) {
       logInfo('컴포넌트 마운트 - 자동 데이터 조회 시작')
-      fetchResults({ skip: 0, append: false, showToast: false })
+      fetchResultsRef.current({ 
+        skip: 0, 
+        append: false, 
+        showToast: false,
+        currentFilters: filters
+      })
     }
-  }, [autoFetch, logInfo, fetchResults]) // fetchResults 의존성 추가
+  }, [autoFetch, logInfo, filters]) // fetchResults 의존성 제거
 
   // === 필터 변경 시 자동 재조회 (디바운스 적용) ===
   useEffect(() => {
-    if (autoFetch && isMountedRef.current) {
-      logInfo('필터 변경 감지 - 데이터 재조회', { filters: JSON.stringify(filters) })
-      fetchResults({ skip: 0, append: false, showToast: false })
+    if (autoFetch && isMountedRef.current && fetchResultsRef.current) {
+      logInfo('필터 변경 감지 - 데이터 재조회', { filters })
+      fetchResultsRef.current({ 
+        skip: 0, 
+        append: false, 
+        showToast: false,
+        currentFilters: filters
+      })
     }
-  }, [autoFetch, JSON.stringify(filters), logInfo, fetchResults]) // fetchResults 의존성 추가
+  }, [autoFetch, filters.neId, filters.cellId, filters.startDate, filters.endDate, filters.status, logInfo]) // 개별 필터 필드로 의존성 분리
 
   // === 계산된 값들 ===
   const isEmpty = useMemo(() => !loading && results.length === 0, [loading, results.length])
