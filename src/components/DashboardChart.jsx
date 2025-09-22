@@ -18,33 +18,46 @@
  * - error: 에러 상태 (추가)
  */
 
-import React, { useState, useCallback } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts'
-import { Button } from '@/components/ui/button.jsx'
-import { RefreshCw, BarChart3, AlertCircle } from 'lucide-react'
+import React, { useState, useCallback } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+} from "recharts";
+import { Button } from "@/components/ui/button.jsx";
+import { RefreshCw, BarChart3, AlertCircle } from "lucide-react";
 
 // 로깅 유틸리티
 const logDashboardChart = (level, message, data = null) => {
-  const timestamp = new Date().toISOString()
-  const prefix = `[DashboardChart:${timestamp}]`
-  
+  const timestamp = new Date().toISOString();
+  const prefix = `[DashboardChart:${timestamp}]`;
+
   switch (level) {
-    case 'info':
-      console.log(`${prefix} ${message}`, data)
-      break
-    case 'error':
-      console.error(`${prefix} ${message}`, data)
-      break
-    case 'warn':
-      console.warn(`${prefix} ${message}`, data)
-      break
-    case 'debug':
-      console.debug(`${prefix} ${message}`, data)
-      break
+    case "info":
+      console.log(`${prefix} ${message}`, data);
+      break;
+    case "error":
+      console.error(`${prefix} ${message}`, data);
+      break;
+    case "warn":
+      console.warn(`${prefix} ${message}`, data);
+      break;
+    case "debug":
+      console.debug(`${prefix} ${message}`, data);
+      break;
     default:
-      console.log(`${prefix} ${message}`, data)
+      console.log(`${prefix} ${message}`, data);
   }
-}
+};
 
 /**
  * 차트 색상 생성 함수
@@ -52,11 +65,18 @@ const logDashboardChart = (level, message, data = null) => {
  * @returns {string} 색상 코드
  */
 const colorFor = (index) => {
-  const preset = ['#8884d8','#82ca9d','#ffc658','#ff7300','#8dd1e1','#d084d0']
-  if (index < preset.length) return preset[index]
-  const hue = (index * 47) % 360
-  return `hsl(${hue}, 70%, 50%)`
-}
+  const preset = [
+    "#8884d8",
+    "#82ca9d",
+    "#ffc658",
+    "#ff7300",
+    "#8dd1e1",
+    "#d084d0",
+  ];
+  if (index < preset.length) return preset[index];
+  const hue = (index * 47) % 360;
+  return `hsl(${hue}, 70%, 50%)`;
+};
 
 const DashboardChart = ({
   chartData,
@@ -68,29 +88,32 @@ const DashboardChart = ({
   enableTimeComparison,
   loading = false,
   onRefresh,
-  error = null
+  error = null,
 }) => {
   // 로컬 로딩 상태 (차트별 새로고침용)
-  const [chartLoading, setChartLoading] = useState(false)
+  const [chartLoading, setChartLoading] = useState(false);
 
   // 차트별 새로고침 핸들러
   const handleChartRefresh = useCallback(async () => {
     if (onRefresh) {
-      setChartLoading(true)
-      logDashboardChart('info', '차트별 새로고침 시작', { chartKey })
+      setChartLoading(true);
+      logDashboardChart("info", "차트별 새로고침 시작", { chartKey });
 
       try {
-        await onRefresh()
-        logDashboardChart('info', '차트별 새로고침 완료', { chartKey })
+        await onRefresh();
+        logDashboardChart("info", "차트별 새로고침 완료", { chartKey });
       } catch (error) {
-        logDashboardChart('error', '차트별 새로고침 실패', { chartKey, error: error.message })
+        logDashboardChart("error", "차트별 새로고침 실패", {
+          chartKey,
+          error: error.message,
+        });
       } finally {
-        setChartLoading(false)
+        setChartLoading(false);
       }
     }
-  }, [onRefresh, chartKey])
+  }, [onRefresh, chartKey]);
 
-  logDashboardChart('debug', 'DashboardChart 렌더링', {
+  logDashboardChart("debug", "DashboardChart 렌더링", {
     chartKey,
     chartStyle,
     dataLength: chartData?.length,
@@ -99,8 +122,10 @@ const DashboardChart = ({
     hasError: !!error,
     showGrid,
     showLegend,
-    enableTimeComparison
-  })
+    enableTimeComparison,
+    chartHeight: enableTimeComparison ? "h-80" : "h-64",
+    xAxisHeight: enableTimeComparison ? 120 : 60,
+  });
 
   // 로딩 상태 처리
   if (loading || chartLoading) {
@@ -110,15 +135,21 @@ const DashboardChart = ({
           <BarChart3 className="h-12 w-12 text-muted-foreground mb-2" />
         </div>
         <p className="text-sm text-muted-foreground">
-          {chartLoading ? '차트 새로고침 중...' : '데이터 로딩 중...'}
+          {chartLoading ? "차트 새로고침 중..." : "데이터 로딩 중..."}
         </p>
         <div className="flex space-x-1 mt-2">
           <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+          <div
+            className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+            style={{ animationDelay: "0.1s" }}
+          ></div>
+          <div
+            className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"
+            style={{ animationDelay: "0.2s" }}
+          ></div>
         </div>
       </div>
-    )
+    );
   }
 
   // 에러 상태 처리
@@ -128,7 +159,7 @@ const DashboardChart = ({
         <AlertCircle className="h-12 w-12 mb-2" />
         <p className="text-sm font-medium mb-1">차트 로드 오류</p>
         <p className="text-xs text-muted-foreground mb-3 text-center max-w-32">
-          {error.message || '데이터를 불러올 수 없습니다'}
+          {error.message || "데이터를 불러올 수 없습니다"}
         </p>
         {onRefresh && (
           <Button
@@ -138,17 +169,19 @@ const DashboardChart = ({
             disabled={chartLoading}
             className="text-xs"
           >
-            <RefreshCw className={`h-3 w-3 mr-1 ${chartLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-3 w-3 mr-1 ${chartLoading ? "animate-spin" : ""}`}
+            />
             다시 시도
           </Button>
         )}
       </div>
-    )
+    );
   }
 
   // 빈 데이터 상태 처리
   if (!chartData || chartData.length === 0) {
-    logDashboardChart('warn', '차트 데이터가 없음', { chartKey })
+    logDashboardChart("warn", "차트 데이터가 없음", { chartKey });
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
         <BarChart3 className="h-12 w-12 mb-2 opacity-50" />
@@ -164,76 +197,105 @@ const DashboardChart = ({
             disabled={chartLoading}
             className="text-xs"
           >
-            <RefreshCw className={`h-3 w-3 mr-1 ${chartLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-3 w-3 mr-1 ${chartLoading ? "animate-spin" : ""}`}
+            />
             새로고침
           </Button>
         )}
       </div>
-    )
+    );
   }
 
   // 모든 데이터 포인트에서 엔티티 키를 수집 (Time1/Time2 모두 포함)
-  const entities = chartData.length > 0 ? Array.from(
-    new Set(
-      chartData.flatMap(dataPoint =>
-        Object.keys(dataPoint).filter(key =>
-          key !== 'time' && key !== '_originalTime' && key !== '_isTime2'
+  const entities =
+    chartData.length > 0
+      ? Array.from(
+          new Set(
+            chartData.flatMap((dataPoint) =>
+              Object.keys(dataPoint).filter(
+                (key) =>
+                  key !== "time" &&
+                  key !== "_originalTime" &&
+                  key !== "_isTime2"
+              )
+            )
+          )
         )
-      )
-    )
-  ) : []
+      : [];
 
-  logDashboardChart('debug', '차트 엔티티 정보', {
+  logDashboardChart("debug", "차트 엔티티 정보", {
     chartKey,
     entities,
     entitiesCount: entities.length,
     hasTimeComparison: enableTimeComparison,
-    time1Entities: entities.filter(e => e.includes('_Time1')),
-    time2Entities: entities.filter(e => e.includes('_Time2')),
+    time1Entities: entities.filter((e) => e.includes("_Time1")),
+    time2Entities: entities.filter((e) => e.includes("_Time2")),
     chartDataLength: chartData.length,
     // Time2 렌더링 문제 디버깅용
-    time1DataPoints: chartData.filter(d => !d._isTime2).length,
-    time2DataPoints: chartData.filter(d => d._isTime2).length,
-    sampleChartData: chartData.slice(0, 3).map(data => ({
+    time1DataPoints: chartData.filter((d) => !d._isTime2).length,
+    time2DataPoints: chartData.filter((d) => d._isTime2).length,
+    sampleChartData: chartData.slice(0, 3).map((data) => ({
       time: data.time,
       _isTime2: data._isTime2,
-      entityKeys: Object.keys(data).filter(k => !k.startsWith('_')),
+      entityKeys: Object.keys(data).filter((k) => !k.startsWith("_")),
       allKeys: Object.keys(data),
       sampleValues: Object.keys(data)
-        .filter(k => !k.startsWith('_'))
+        .filter((k) => !k.startsWith("_"))
         .slice(0, 3)
-        .map(k => ({ key: k, value: data[k] }))
+        .map((k) => ({ key: k, value: data[k] })),
     })),
     // Time2 데이터 상세 분석
-    time2DetailedInfo: enableTimeComparison ? {
-      time2EntitiesFound: entities.filter(e => e.includes('_Time2')).length,
-      time2DataPoints: chartData.filter(d => d._isTime2),
-      time2SampleValues: chartData
-        .filter(d => d._isTime2)
-        .slice(0, 2)
-        .map(data => ({
-          time: data.time,
-          entities: Object.keys(data).filter(k => !k.startsWith('_')),
-          values: Object.keys(data)
-            .filter(k => !k.startsWith('_'))
-            .reduce((acc, key) => {
-              acc[key] = data[key]
-              return acc
-            }, {})
-        }))
-    } : null
-  })
+    time2DetailedInfo: enableTimeComparison
+      ? {
+          time2EntitiesFound: entities.filter((e) => e.includes("_Time2"))
+            .length,
+          time2DataPoints: chartData.filter((d) => d._isTime2),
+          time2SampleValues: chartData
+            .filter((d) => d._isTime2)
+            .slice(0, 2)
+            .map((data) => ({
+              time: data.time,
+              entities: Object.keys(data).filter((k) => !k.startsWith("_")),
+              values: Object.keys(data)
+                .filter((k) => !k.startsWith("_"))
+                .reduce((acc, key) => {
+                  acc[key] = data[key];
+                  return acc;
+                }, {}),
+            })),
+        }
+      : null,
+  });
 
   const chartProps = {
     data: chartData,
-    className: "h-64"
-  }
+    className: enableTimeComparison ? "h-80" : "h-64",
+  };
 
   // X축 틱 포맷터 - 날짜-시간 형식으로 표시
   const xAxisTickFormatter = (value, index) => {
-    // 이미 데이터에서 날짜-시간 형식으로 포맷팅되어 있으므로 그대로 반환
-    return value
-  }
+    if (!enableTimeComparison) {
+      return value;
+    }
+
+    // 시간 비교 모드에서는 더 간결한 형식으로 표시
+    try {
+      // 날짜-시간 형식에서 시간 부분만 추출하여 표시
+      if (typeof value === "string" && value.includes(" ")) {
+        const [date, time] = value.split(" ");
+        // 시간 부분만 표시 (HH:MM 형식)
+        return time ? time.substring(0, 5) : value;
+      }
+      return value;
+    } catch (error) {
+      logDashboardChart("warn", "X축 틱 포맷팅 오류", {
+        value,
+        error: error.message,
+      });
+      return value;
+    }
+  };
 
   const commonElements = [
     showGrid && <CartesianGrid key="grid" strokeDasharray="3 3" />,
@@ -242,81 +304,104 @@ const DashboardChart = ({
       dataKey="time"
       tickFormatter={enableTimeComparison ? xAxisTickFormatter : undefined}
       angle={enableTimeComparison ? -45 : 0}
-      textAnchor={enableTimeComparison ? 'end' : 'middle'}
-      height={enableTimeComparison ? 80 : 60}
+      textAnchor={enableTimeComparison ? "end" : "middle"}
+      height={enableTimeComparison ? 120 : 60}
+      interval={enableTimeComparison ? "preserveStartEnd" : 0}
+      tick={{ fontSize: 12 }}
     />,
     <YAxis key="yaxis" />,
     <Tooltip
       key="tooltip"
       labelFormatter={(label) => {
         // 라벨에 "시간:" 접두사 추가
-        return `시간: ${label}`
+        return `시간: ${label}`;
       }}
       formatter={(value, name) => {
         if (enableTimeComparison) {
-          // Time1/Time2 비교 시 PEG 이름만 표시 (시간 구분 제거)
-          const baseName = name.replace('_Time1', '').replace('_Time2', '')
-          return [value, baseName]
+          // Time1/Time2 비교 시 PEG 이름과 시간 구분을 명확히 표시
+          const baseName = name.replace("_Time1", "").replace("_Time2", "");
+          const timeType = name.includes("_Time1")
+            ? "Time1"
+            : name.includes("_Time2")
+            ? "Time2"
+            : "";
+          return [value, `${baseName} (${timeType})`];
         }
-        return [value, name]
+        return [value, name];
       }}
     />,
-    showLegend && <Legend
-      key="legend"
-      verticalAlign="bottom"
-      align="center"
-      layout="horizontal"
-      wrapperStyle={{
-        paddingTop: '20px',
-        paddingBottom: '10px'
-      }}
-      formatter={(value, entry, index) => {
-        if (enableTimeComparison) {
-          // Legend에서도 Time1/Time2 접미사 제거하여 순수 PEG 이름만 표시
-          return value.replace('_Time1', '').replace('_Time2', '')
-        }
-        return value
-      }}
-    />
-  ].filter(Boolean)
+    showLegend && (
+      <Legend
+        key="legend"
+        verticalAlign="bottom"
+        align="center"
+        layout="horizontal"
+        wrapperStyle={{
+          paddingTop: "30px",
+          paddingBottom: "10px",
+          fontSize: "12px",
+        }}
+        formatter={(value, entry, index) => {
+          if (enableTimeComparison) {
+            // Legend에서 Time1/Time2 구분을 명확히 표시
+            const baseName = value.replace("_Time1", "").replace("_Time2", "");
+            const timeType = value.includes("_Time1")
+              ? "Time1"
+              : value.includes("_Time2")
+              ? "Time2"
+              : "";
+            return `${baseName} (${timeType})`;
+          }
+          return value;
+        }}
+      />
+    ),
+  ].filter(Boolean);
 
   try {
     // 차트 렌더링 전 데이터 검증
-    logDashboardChart('info', '차트 렌더링 시작', {
+    logDashboardChart("info", "차트 렌더링 시작", {
       chartKey,
       chartStyle,
       enableTimeComparison,
       entitiesCount: entities.length,
       chartDataLength: chartData.length,
-      time1DataPoints: chartData.filter(d => !d._isTime2).length,
-      time2DataPoints: chartData.filter(d => d._isTime2).length,
+      time1DataPoints: chartData.filter((d) => !d._isTime2).length,
+      time2DataPoints: chartData.filter((d) => d._isTime2).length,
       entities,
-      time1Entities: entities.filter(e => e.includes('_Time1')),
-      time2Entities: entities.filter(e => e.includes('_Time2')),
-      firstDataPoint: chartData.length > 0 ? {
-        time: chartData[0].time,
-        _isTime2: chartData[0]._isTime2,
-        allKeys: Object.keys(chartData[0]),
-        entityKeys: Object.keys(chartData[0]).filter(k => !k.startsWith('_')),
-        entityValues: Object.keys(chartData[0])
-          .filter(k => !k.startsWith('_'))
-          .reduce((acc, key) => {
-            acc[key] = chartData[0][key]
-            return acc
-          }, {})
-      } : null
-    })
+      time1Entities: entities.filter((e) => e.includes("_Time1")),
+      time2Entities: entities.filter((e) => e.includes("_Time2")),
+      firstDataPoint:
+        chartData.length > 0
+          ? {
+              time: chartData[0].time,
+              _isTime2: chartData[0]._isTime2,
+              allKeys: Object.keys(chartData[0]),
+              entityKeys: Object.keys(chartData[0]).filter(
+                (k) => !k.startsWith("_")
+              ),
+              entityValues: Object.keys(chartData[0])
+                .filter((k) => !k.startsWith("_"))
+                .reduce((acc, key) => {
+                  acc[key] = chartData[0][key];
+                  return acc;
+                }, {}),
+            }
+          : null,
+    });
 
     switch (chartStyle) {
-      case 'area':
+      case "area":
         return (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart {...chartProps}>
               {commonElements}
               {entities.map((entity, index) => {
-                if (enableTimeComparison && entity.includes('_Time')) {
-                  const baseEntity = entity.replace('_Time1', '').replace('_Time2', '')
-                  const isTime1 = entity.includes('_Time1')
+                if (enableTimeComparison && entity.includes("_Time")) {
+                  const baseEntity = entity
+                    .replace("_Time1", "")
+                    .replace("_Time2", "");
+                  const isTime1 = entity.includes("_Time1");
                   return (
                     <Area
                       key={entity}
@@ -327,9 +412,9 @@ const DashboardChart = ({
                       fillOpacity={0.3}
                       strokeWidth={2}
                       strokeDasharray={isTime1 ? undefined : "5 5"}
-                      name={`${baseEntity} (${isTime1 ? 'Time1' : 'Time2'})`}
+                      name={`${baseEntity}_${isTime1 ? "Time1" : "Time2"}`}
                     />
-                  )
+                  );
                 } else {
                   return (
                     <Area
@@ -341,30 +426,32 @@ const DashboardChart = ({
                       fillOpacity={0.3}
                       strokeWidth={2}
                     />
-                  )
+                  );
                 }
               })}
             </AreaChart>
           </ResponsiveContainer>
-        )
-      
-      case 'bar':
+        );
+
+      case "bar":
         return (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart {...chartProps}>
               {commonElements}
               {entities.map((entity, index) => {
-                if (enableTimeComparison && entity.includes('_Time')) {
-                  const baseEntity = entity.replace('_Time1', '').replace('_Time2', '')
-                  const isTime1 = entity.includes('_Time1')
+                if (enableTimeComparison && entity.includes("_Time")) {
+                  const baseEntity = entity
+                    .replace("_Time1", "")
+                    .replace("_Time2", "");
+                  const isTime1 = entity.includes("_Time1");
                   return (
                     <Bar
                       key={entity}
                       dataKey={entity}
                       fill={colorFor((idx + index) % 12)}
-                      name={`${baseEntity} (${isTime1 ? 'Time1' : 'Time2'})`}
+                      name={`${baseEntity}_${isTime1 ? "Time1" : "Time2"}`}
                     />
-                  )
+                  );
                 } else {
                   return (
                     <Bar
@@ -372,23 +459,25 @@ const DashboardChart = ({
                       dataKey={entity}
                       fill={colorFor((idx + index) % 12)}
                     />
-                  )
+                  );
                 }
               })}
             </BarChart>
           </ResponsiveContainer>
-        )
-      
-      case 'line':
+        );
+
+      case "line":
       default:
         return (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart {...chartProps}>
               {commonElements}
               {entities.map((entity, index) => {
-                if (enableTimeComparison && entity.includes('_Time')) {
-                  const baseEntity = entity.replace('_Time1', '').replace('_Time2', '')
-                  const isTime1 = entity.includes('_Time1')
+                if (enableTimeComparison && entity.includes("_Time")) {
+                  const baseEntity = entity
+                    .replace("_Time1", "")
+                    .replace("_Time2", "");
+                  const isTime1 = entity.includes("_Time1");
                   return (
                     <Line
                       key={entity}
@@ -397,9 +486,9 @@ const DashboardChart = ({
                       stroke={colorFor((idx + index) % 12)}
                       strokeWidth={2}
                       strokeDasharray={isTime1 ? undefined : "5 5"}
-                      name={`${baseEntity} (${isTime1 ? 'Time1' : 'Time2'})`}
+                      name={`${baseEntity}_${isTime1 ? "Time1" : "Time2"}`}
                     />
-                  )
+                  );
                 } else {
                   return (
                     <Line
@@ -409,22 +498,21 @@ const DashboardChart = ({
                       stroke={colorFor((idx + index) % 12)}
                       strokeWidth={2}
                     />
-                  )
+                  );
                 }
               })}
             </LineChart>
           </ResponsiveContainer>
-        )
+        );
     }
   } catch (error) {
-    logDashboardChart('error', '차트 렌더링 오류', { key, error })
+    logDashboardChart("error", "차트 렌더링 오류", { key, error });
     return (
       <div className="h-full flex items-center justify-center text-red-500">
         차트 렌더링 오류
       </div>
-    )
+    );
   }
-}
+};
 
-export default DashboardChart
-
+export default DashboardChart;
