@@ -61,18 +61,18 @@ export default defineConfig({
     // 청크 크기 경고 임계값 설정 (500KB -> 300KB)
     chunkSizeWarningLimit: 300,
     rollupOptions: {
+      // 모듈 초기화 순서 문제 해결을 위한 설정
+      external: [],
       output: {
+        // 모듈 초기화 순서 보장
+        format: "es",
+        // 청크 간 의존성 문제 해결
+        interop: "auto",
         // 수동 청크 분할 설정 (React 안전하게 처리)
         manualChunks: (id) => {
           // 큰 페이지 컴포넌트들을 별도 청크로 분리 (코드 스플리팅)
           if (id.includes("/src/components/Dashboard")) {
             return "dashboard-page";
-          }
-          if (id.includes("/src/components/Statistics")) {
-            return "statistics-page";
-          }
-          if (id.includes("/src/components/LLMAnalysisManager")) {
-            return "llm-analysis-page";
           }
           if (id.includes("/src/components/PreferenceManager")) {
             return "preference-page";
@@ -86,10 +86,8 @@ export default defineConfig({
             return "common-components";
           }
 
-          // Recharts 차트 라이브러리 (큰 청크를 분할)
-          if (id.includes("recharts")) {
-            return "chart-vendor";
-          }
+          // 차트 관련 라이브러리들을 vendor 청크에 포함하여 초기화 문제 해결
+          // (별도 청크로 분리하지 않고 vendor에 포함)
 
           // Radix UI 라이브러리들 (UI 컴포넌트)
           if (id.includes("@radix-ui")) {
@@ -130,6 +128,23 @@ export default defineConfig({
           if (id.includes("node_modules")) {
             return "vendor";
           }
+        },
+        // 청크 파일명에 해시 추가하여 캐싱 문제 방지
+        chunkFileNames: (chunkInfo) => {
+          const facadeModuleId = chunkInfo.facadeModuleId
+            ? chunkInfo.facadeModuleId
+                .split("/")
+                .pop()
+                .replace(".jsx", "")
+                .replace(".js", "")
+            : "chunk";
+          return `assets/${facadeModuleId}-[hash].js`;
+        },
+        // 에셋 파일명도 해시 추가
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name.split(".");
+          const ext = info[info.length - 1];
+          return `assets/[name]-[hash].${ext}`;
         },
       },
     },

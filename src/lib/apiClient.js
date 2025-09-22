@@ -17,9 +17,8 @@
 
 import axios from "axios";
 import { toast } from "sonner";
-// TypeScript 타입 import (JSDoc에서 사용)
-// @ts-ignore - JS 파일에서 TS 타입 import
-import { AnalysisResult } from "../types";
+// TypeScript 타입은 JSDoc에서만 사용하므로 import 제거
+// @typedef {import("../types/index.js").AnalysisResult} AnalysisResult
 
 // ================================
 // 로깅 유틸리티
