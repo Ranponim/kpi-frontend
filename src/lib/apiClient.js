@@ -345,7 +345,7 @@ export const getDetailedResult = async (id) => {
       throw new Error("유효하지 않은 분석 결과 ID입니다.");
     }
 
-    const response = await apiClient.get(`/api/results/${id}/detailed`);
+    const response = await apiClient.get(`/api/results/${id}`);
 
     // 응답 데이터 검증
     if (!response.data) {

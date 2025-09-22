@@ -333,7 +333,7 @@ const ResultDetail = ({
               message: err.message,
               url: err?.config?.url,
               method: err?.config?.method,
-              retryAttempts: maxRetries + 1,
+              retryAttempts: 3, // maxRetries + 1 대신 고정값 사용
               timestamp: new Date().toISOString(),
             };
 
