@@ -98,7 +98,7 @@ const ResultDetail = ({
   isOpen,
   onClose,
   resultIds = [], // 단일 ID 또는 비교용 ID 배열
-  mode = "single", // 'single' | 'compare'
+  mode = "single", // 'single' | 'compare' | 'template'
 }) => {
   // === 상태 관리 ===
   const [results, setResults] = useState([]);
@@ -111,7 +111,6 @@ const ResultDetail = ({
   const [mahalanobisResult, setMahalanobisResult] = useState(null); // 마할라노비스 거리 결과
   const [pegComparisonResult, setPegComparisonResult] = useState(null); // PEG 비교 결과
 
-  const [choiLoading, setChoiLoading] = useState(false);
   const [choiData, setChoiData] = useState(null);
 
   // === 도움말 모달 상태 ===
@@ -166,13 +165,272 @@ const ResultDetail = ({
   // === 메모리 최적화: 큰 데이터 청크 단위 처리 ===
   const [dataChunkSize] = useState(50); // 한 번에 처리할 데이터 청크 크기
 
+  // === 모드 변수 선언 (useEffect보다 먼저 선언) ===
   const isCompareMode = mode === "compare" && resultIds.length > 1;
   const isSingleMode = mode === "single" && resultIds.length === 1;
+  const isTemplateMode = mode === "template";
+
+  // === results 배열 안전성 검증 ===
+  const safeResults = useMemo(() => {
+    if (!Array.isArray(results)) {
+      console.warn("⚠️ results가 배열이 아닙니다:", results);
+      return [];
+    }
+    return results;
+  }, [results]);
+
+  // === 템플릿 모드 디버깅 정보 ===
+  useEffect(() => {
+    if (isTemplateMode) {
+      console.log("🎨 템플릿 모드 디버깅:", {
+        results: results,
+        safeResults: safeResults,
+        resultsType: typeof results,
+        isArray: Array.isArray(results),
+        length: Array.isArray(results) ? results.length : "N/A",
+      });
+    }
+  }, [isTemplateMode, results, safeResults]);
+
+  // === 템플릿 데이터 생성 ===
+  const createTemplateData = useCallback(() => {
+    const now = new Date();
+    return {
+      id: "template-debug-001",
+      analysisDate: now.toISOString(),
+      neId: "NE_TEMPLATE_001",
+      cellId: "CELL_TEMPLATE_001",
+      status: "success",
+      llmModel: "gpt-4-turbo",
+      metadata: {
+        workflow_version: "3.0",
+        processing_timestamp: now.toISOString(),
+        request_id: "req_template_debug",
+        enable_mock: false,
+        data_processor: true,
+        use_choi: true,
+      },
+      choi_judgement: {
+        overall: "OK",
+        reasons: [
+          "Most KPIs within normal range",
+          "Minor degradation in DL throughput",
+          "Network performance stable overall",
+        ],
+        by_kpi: {
+          AirMacDLThruAvg: {
+            status: "POK",
+            evidence: {
+              threshold: 10.0,
+              actual_change: -5.82,
+              severity: "medium",
+            },
+          },
+          Random_access_preamble_count: {
+            status: "OK",
+            evidence: {
+              threshold: 15.0,
+              actual_change: 10.4,
+              severity: "low",
+            },
+          },
+          UL_throughput_avg: {
+            status: "OK",
+            evidence: {
+              threshold: 8.0,
+              actual_change: 2.1,
+              severity: "low",
+            },
+          },
+        },
+        abnormal_detection: {
+          detected_anomalies: 2,
+          anomaly_types: ["throughput_degradation", "latency_spike"],
+          confidence_score: 0.85,
+        },
+        warnings: [
+          "DL throughput shows consistent decline pattern",
+          "Monitor for potential network congestion",
+        ],
+        algorithm_version: "choi-v1.2",
+        processing_time_ms: 245,
+      },
+      data: {
+        analysis: {
+          executive_summary:
+            "네트워크 성능 분석 결과, 전반적으로 안정적인 상태를 유지하고 있으나 DL throughput에서 경미한 성능 저하가 관찰됩니다. 이는 일시적인 트래픽 증가로 인한 것으로 판단되며, 지속적인 모니터링이 필요합니다.",
+          overall_summary:
+            "분석 기간 동안 대부분의 KPI가 정상 범위 내에서 동작하고 있습니다. AirMacDLThruAvg에서 5.82%의 성능 저하가 감지되었으나, 이는 임계값(10%) 이하로 경미한 수준입니다.",
+          diagnostic_findings: [
+            {
+              primary_hypothesis:
+                "DL throughput 성능 저하가 주요 관찰 사항입니다",
+              supporting_evidence: "AirMacDLThruAvg KPI에서 -5.82% 변화율 관찰",
+              confounding_factors_assessment:
+                "네트워크 트래픽 증가와 관련된 일시적 현상으로 판단",
+            },
+            {
+              primary_hypothesis:
+                "UL throughput은 정상 범위 내에서 안정적입니다",
+              supporting_evidence: "UL_throughput_avg에서 +2.1% 개선 관찰",
+              confounding_factors_assessment:
+                "사용자 활동 패턴의 정상적인 변화",
+            },
+          ],
+          recommended_actions: [
+            {
+              priority: "High",
+              action: "DL throughput 모니터링 강화",
+              details:
+                "향후 24시간 동안 AirMacDLThruAvg KPI를 집중 모니터링하고, 추가 성능 저하 시 즉시 대응",
+            },
+            {
+              priority: "Medium",
+              action: "네트워크 용량 검토",
+              details: "현재 트래픽 패턴을 분석하여 용량 증설 필요성 검토",
+            },
+            {
+              priority: "Low",
+              action: "정기 성능 리포트 생성",
+              details: "주간 성능 트렌드 리포트를 통한 장기적 패턴 분석",
+            },
+          ],
+        },
+      },
+      kpiResults: {
+        AirMacDLThruAvg: { "N-1": 85.2, N: 80.3, weight: 8 },
+        Random_access_preamble_count: { "N-1": 120.5, N: 133.1, weight: 6 },
+        UL_throughput_avg: { "N-1": 45.8, N: 46.8, weight: 7 },
+        DL_throughput_avg: { "N-1": 92.1, N: 88.5, weight: 9 },
+        Connection_success_rate: { "N-1": 98.5, N: 98.2, weight: 8 },
+      },
+      stats: [
+        {
+          kpi_name: "AirMacDLThruAvg",
+          period: "N-1",
+          avg: 85.2,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "AirMacDLThruAvg",
+          period: "N",
+          avg: 80.3,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Random_access_preamble_count",
+          period: "N-1",
+          avg: 120.5,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Random_access_preamble_count",
+          period: "N",
+          avg: 133.1,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "UL_throughput_avg",
+          period: "N-1",
+          avg: 45.8,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "UL_throughput_avg",
+          period: "N",
+          avg: 46.8,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "DL_throughput_avg",
+          period: "N-1",
+          avg: 92.1,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "DL_throughput_avg",
+          period: "N",
+          avg: 88.5,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Connection_success_rate",
+          period: "N-1",
+          avg: 98.5,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Connection_success_rate",
+          period: "N",
+          avg: 98.2,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+      ],
+      request_params: {
+        peg_definitions: {
+          AirMacDLThruAvg: { weight: 8 },
+          Random_access_preamble_count: { weight: 6 },
+          UL_throughput_avg: { weight: 7 },
+          DL_throughput_avg: { weight: 9 },
+          Connection_success_rate: { weight: 8 },
+        },
+      },
+      // 마할라노비스 분석 결과 (템플릿용)
+      mahalanobisAnalysis: {
+        success: true,
+        data: {
+          totalKpis: 5,
+          abnormalKpis: [
+            {
+              kpi_name: "AirMacDLThruAvg",
+              distance: 2.45,
+              threshold: 2.0,
+              status: "abnormal",
+              severity: "medium",
+            },
+          ],
+          abnormalScore: 0.2,
+          analysis: {
+            screening: {
+              description:
+                "일부 KPI에서 경미한 이상이 감지되었으나 전반적으로 양호한 상태입니다.",
+            },
+          },
+        },
+      },
+    };
+  }, []);
 
   // === API 호출 (청크 단위 처리로 메모리 최적화) ===
   const fetchResultDetails = async (ids) => {
     setLoading(true);
     setError(null);
+
+    // 템플릿 모드인 경우 템플릿 데이터 사용
+    if (isTemplateMode) {
+      console.log("🎨 템플릿 모드: 템플릿 데이터 사용");
+      try {
+        const templateData = createTemplateData();
+        setResults([templateData]); // 배열로 감싸서 설정
+
+        // 템플릿 모드에서 마할라노비스 분석 결과 자동 설정
+        if (templateData.mahalanobisAnalysis) {
+          console.log(
+            "🎨 템플릿 모드: 마할라노비스 분석 결과 설정",
+            templateData.mahalanobisAnalysis
+          );
+          setMahalanobisResult(templateData.mahalanobisAnalysis.data);
+        }
+
+        setLoading(false);
+        return;
+      } catch (error) {
+        console.error("템플릿 데이터 생성 오류:", error);
+        setError("템플릿 데이터 생성에 실패했습니다.");
+        setLoading(false);
+        return;
+      }
+    }
 
     // 이전 요청이 있으면 취소
     if (abortControllerRef.current) {
@@ -633,6 +891,13 @@ const ResultDetail = ({
       );
 
       // 백엔드 응답을 기존 UI가 기대하는 형식으로 변환
+      if (!result) {
+        return {
+          error: "백엔드 응답이 없습니다",
+          timestamp: new Date().toISOString(),
+        };
+      }
+
       if (result.success === false) {
         return {
           error: result.message || "백엔드 분석 실패",
@@ -640,7 +905,7 @@ const ResultDetail = ({
         };
       }
 
-      return result.data;
+      return result.data || result;
     } catch (error) {
       console.error("❌ 마할라노비스 거리 계산 실패 (백엔드 API)", error);
       return {
@@ -808,7 +1073,7 @@ const ResultDetail = ({
   // === 마할라노비스 거리 분석 수행 (성능 최적화 및 캐싱) ===
   const performMahalanobisAnalysis = useCallback(async () => {
     // 현재 results를 직접 참조하여 초기화 순서 문제 방지
-    const currentProcessedResults = results.filter((r) => !r.error);
+    const currentProcessedResults = safeResults.filter((r) => !r.error);
 
     if (!currentProcessedResults.length || !currentProcessedResults[0].stats) {
       console.log("📊 마할라노비스 분석: 데이터가 부족합니다");
@@ -873,12 +1138,12 @@ const ResultDetail = ({
         _cacheKey: `${resultId}-${dataHash}`,
       });
     }
-  }, [results, calculateMahalanobisDistance, mahalanobisResult]); // processedResults 대신 results 사용
+  }, [safeResults, calculateMahalanobisDistance, mahalanobisResult]); // safeResults 사용
 
   // === PEG 비교 분석 수행 ===
   const performPegComparisonAnalysis = useCallback(() => {
     // 현재 results를 직접 참조하여 초기화 순서 문제 방지
-    const currentProcessedResults = results.filter((r) => !r.error);
+    const currentProcessedResults = safeResults.filter((r) => !r.error);
 
     if (!currentProcessedResults.length || !currentProcessedResults[0].stats) {
       console.log("📊 PEG 비교 분석: 데이터가 부족합니다");
@@ -894,12 +1159,12 @@ const ResultDetail = ({
       console.error("❌ PEG 비교 분석 실패:", error);
       setPegComparisonResult(null);
     }
-  }, [results]); // processedResults 대신 results 사용
+  }, [safeResults]); // safeResults 사용
 
   // === Effect: 데이터 로딩 완료 후 분석 수행 ===
   useEffect(() => {
     // 현재 results를 직접 참조하여 초기화 순서 문제 방지
-    const currentProcessedResults = results.filter((r) => !r.error);
+    const currentProcessedResults = safeResults.filter((r) => !r.error);
 
     if (currentProcessedResults.length > 0 && !loading) {
       console.log("🔬 데이터 로딩 완료, 분석 시작");
@@ -911,11 +1176,27 @@ const ResultDetail = ({
       performPegComparisonAnalysis();
     }
   }, [
-    results,
+    safeResults,
     loading,
     performMahalanobisAnalysis,
     performPegComparisonAnalysis,
-  ]); // processedResults 대신 results 사용
+  ]); // safeResults 사용
+
+  // === 템플릿 모드에서 분석 강제 실행 ===
+  useEffect(() => {
+    if (isTemplateMode && safeResults.length > 0 && !loading) {
+      console.log("🎨 템플릿 모드: 분석 강제 실행");
+      // 템플릿 모드에서는 모든 분석을 강제로 실행
+      performMahalanobisAnalysis();
+      performPegComparisonAnalysis();
+    }
+  }, [
+    isTemplateMode,
+    safeResults,
+    loading,
+    performMahalanobisAnalysis,
+    performPegComparisonAnalysis,
+  ]);
 
   // === Effect: 모달이 닫힐 때 상태 정리 ===
   useEffect(() => {
@@ -928,12 +1209,12 @@ const ResultDetail = ({
   // === Effect: 데이터 로딩 완료 후 알고리즘 실행 ===
   useEffect(() => {
     console.log("🔍 마할라노비스 분석 디버깅:", {
-      resultsLength: results.length,
+      resultsLength: safeResults.length,
       loading,
-      processedResults: results.filter((r) => !r.error).length,
+      processedResults: safeResults.filter((r) => !r.error).length,
     });
 
-    const currentProcessedResults = results.filter((r) => !r.error);
+    const currentProcessedResults = safeResults.filter((r) => !r.error);
     if (currentProcessedResults.length > 0 && !loading) {
       const firstResult = currentProcessedResults[0];
       console.log("📊 첫 번째 결과 데이터 구조:", {
@@ -945,6 +1226,29 @@ const ResultDetail = ({
         statsLength: firstResult?.stats?.length || 0,
         fullResult: firstResult,
       });
+
+      // Choi 알고리즘 데이터 추출 (use_choi: true인 경우)
+      const metadata = firstResult?.metadata || {};
+      const useChoi = metadata?.use_choi === true;
+      console.log("🧠 Choi 알고리즘 사용 여부:", { useChoi, metadata });
+
+      if (useChoi) {
+        // choi_judgement 데이터 추출
+        const choiJudgement = firstResult?.choi_judgement;
+        if (choiJudgement) {
+          console.log("✅ Choi 알고리즘 데이터 발견:", choiJudgement);
+          setChoiData(choiJudgement);
+          setChoiAlgorithmResult("done");
+        } else {
+          console.warn(
+            "⚠️ use_choi가 true이지만 choi_judgement 데이터가 없습니다"
+          );
+          setChoiAlgorithmResult("error");
+        }
+      } else {
+        console.log("ℹ️ Choi 알고리즘 미사용 (use_choi: false 또는 없음)");
+        setChoiAlgorithmResult("absent");
+      }
 
       // 마할라노비스 거리 계산
       if (firstResult?.kpiResults || firstResult?.stats) {
@@ -1022,8 +1326,8 @@ const ResultDetail = ({
   // === 처리된 결과 데이터 ===
   const processedResults = useMemo(() => {
     // 모킹 제거: 에러가 있는 항목은 제외하고 그대로 사용
-    return results.filter((r) => !r.error);
-  }, [results]);
+    return safeResults.filter((r) => !r.error);
+  }, [safeResults]);
 
   // === 비교 모드 데이터 처리 ===
   const comparisonData = useMemo(() => {
@@ -2096,151 +2400,66 @@ const ResultDetail = ({
               <div className="text-sm">{result.llmModel || "N/A"}</div>
             </div>
           </div>
-
-          {(() => {
-            const { analysis } = extractAnalysisData(result);
-            const { summaryText } = extractSummaryText(analysis);
-            const hasSummary =
-              typeof summaryText === "string" &&
-              summaryText.trim() &&
-              summaryText !== "요약 정보가 없습니다.";
-            if (!hasSummary) return null;
-            return (
-              <div className="space-y-2 max-w-full overflow-hidden">
-                <div className="text-sm font-medium text-muted-foreground">
-                  분석 결과
-                </div>
-                <div className="text-sm bg-muted p-3 rounded-md max-h-48 overflow-y-auto break-words whitespace-pre-wrap w-full">
-                  {summaryText}
-                </div>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const { analysis } = extractAnalysisData(result);
-            let recommendationItems = [];
-            if (Array.isArray(analysis?.recommended_actions)) {
-              recommendationItems = analysis.recommended_actions;
-            } else if (
-              typeof analysis?.recommended_actions === "string" &&
-              analysis.recommended_actions.trim()
-            ) {
-              recommendationItems = [analysis.recommended_actions];
-            } else if (Array.isArray(analysis?.recommendations)) {
-              recommendationItems = analysis.recommendations;
-            } else if (
-              typeof analysis?.recommendations === "string" &&
-              analysis.recommendations.trim()
-            ) {
-              recommendationItems = [analysis.recommendations];
-            }
-            if (!recommendationItems.length) return null;
-            return (
-              <div className="space-y-2 max-w-full overflow-hidden">
-                <div className="text-sm font-medium text-muted-foreground">
-                  권장 사항
-                </div>
-                <div className="space-y-1 max-w-full overflow-hidden">
-                  {recommendationItems.map((rec, index) => (
-                    <div
-                      key={index}
-                      className="text-sm bg-green-50 dark:bg-green-900/20 p-2 rounded border-l-2 border-l-green-500 break-words whitespace-pre-wrap max-w-full"
-                    >
-                      {typeof rec === "string" ? rec : JSON.stringify(rec)}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
         </CardContent>
       </Card>
     </div>
   );
 
   // === Choi 알고리즘 결과 렌더링 ===
-  const renderChoiAlgorithmResult = () => (
-    <Card className="border-l-4 border-l-purple-500">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-purple-600" />
-              Choi 알고리즘 판정 결과
-              {choiData ? (
-                <Badge variant="outline" className="text-purple-600">
-                  완료
-                </Badge>
-              ) : choiLoading ? (
-                <Badge variant="outline" className="text-purple-600">
-                  실행 중
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="text-purple-600">
-                  대기
-                </Badge>
-              )}
-            </CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            {!choiLoading && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={async () => {
-                  try {
-                    setChoiLoading(true);
-                    setChoiAlgorithmResult("running");
-                    // 기본 파라미터 구성: 결과 내 메타에서 유추하거나 기본값 사용
-                    const first = processedResults?.[0];
-                    const cellIds = (first?.stats || [])
-                      .map((s) => s?.cell_id)
-                      .filter(Boolean)
-                      .slice(0, 5);
-                    const payload = {
-                      input_data: {},
-                      cell_ids: cellIds.length
-                        ? Array.from(new Set(cellIds))
-                        : ["cell_001"],
-                      time_range: {
-                        pre_start: new Date(
-                          Date.now() - 2 * 60 * 60 * 1000
-                        ).toISOString(),
-                        pre_end: new Date(
-                          Date.now() - 60 * 60 * 1000
-                        ).toISOString(),
-                        post_start: new Date(
-                          Date.now() - 30 * 60 * 1000
-                        ).toISOString(),
-                        post_end: new Date().toISOString(),
-                      },
-                      compare_mode: true,
-                    };
-                    const res = await runChoiAnalysis(payload);
-                    // 응답에서 choi_judgement 우선 확보
-                    const choi = res?.kpi_judgement
-                      ? {
-                          overall: res.kpi_judgement.overall,
-                          reasons: res.kpi_judgement.reasons || [],
-                          by_kpi: res.kpi_judgement.by_kpi || {},
-                          warnings: res.processing_warnings || [],
-                        }
-                      : res?.peg_analysis?.choi_judgement || null;
-                    setChoiData(choi);
-                    setChoiAlgorithmResult("done");
-                  } catch (e) {
-                    console.error("Choi 분석 실패", e);
-                    setChoiAlgorithmResult("error");
-                  } finally {
-                    setChoiLoading(false);
-                  }
-                }}
-                className="text-purple-600 border-purple-200 hover:bg-purple-50"
-              >
-                {choiData ? "재실행" : "분석 실행"}
-              </Button>
-            )}
+  const renderChoiAlgorithmResult = () => {
+    const getStatusBadgeVariant = (status) => {
+      switch (status?.toLowerCase()) {
+        case "ok":
+          return "default";
+        case "pok":
+          return "secondary";
+        case "ng":
+          return "destructive";
+        default:
+          return "outline";
+      }
+    };
+
+    const getStatusText = (status) => {
+      switch (status?.toLowerCase()) {
+        case "ok":
+          return "정상";
+        case "pok":
+          return "주의";
+        case "ng":
+          return "이상";
+        default:
+          return status || "N/A";
+      }
+    };
+
+    return (
+      <Card className="border-l-4 border-l-purple-500">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-purple-600" />
+                Choi 알고리즘 판정 결과
+                {choiData ? (
+                  <Badge variant="outline" className="text-purple-600">
+                    완료
+                  </Badge>
+                ) : choiAlgorithmResult === "error" ? (
+                  <Badge variant="destructive" className="text-red-600">
+                    오류
+                  </Badge>
+                ) : choiAlgorithmResult === "absent" ? (
+                  <Badge variant="outline" className="text-gray-600">
+                    미사용
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-purple-600">
+                    대기
+                  </Badge>
+                )}
+              </CardTitle>
+            </div>
             <Button
               variant="ghost"
               size="sm"
@@ -2250,96 +2469,273 @@ const ResultDetail = ({
               <HelpCircle className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-        <CardDescription>
-          Choi 알고리즘 문서 기반의 품질 판정 결과를 표시합니다.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {choiLoading && (
-          <div className="flex items-center justify-center gap-2 py-6">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <p className="text-muted-foreground">분석 실행 중...</p>
-          </div>
-        )}
-        {!choiLoading && choiData && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">전체 판정</span>
-              <Badge variant="outline" className="text-purple-700">
-                {choiData.overall || "N/A"}
-              </Badge>
-            </div>
-            {Array.isArray(choiData.reasons) && choiData.reasons.length > 0 && (
-              <div>
-                <div className="text-sm font-medium mb-2">사유</div>
-                <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                  {choiData.reasons.map((r, idx) => (
-                    <li key={idx}>
-                      {typeof r === "string" ? r : JSON.stringify(r)}
-                    </li>
-                  ))}
-                </ul>
+          <CardDescription>
+            Choi 알고리즘 문서 기반의 품질 판정 결과를 표시합니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {choiData ? (
+            <div className="space-y-6">
+              {/* 전체 판정 */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">
+                  전체 판정
+                </span>
+                <Badge
+                  variant={getStatusBadgeVariant(choiData.overall)}
+                  className="text-lg px-3 py-1"
+                >
+                  {getStatusText(choiData.overall)}
+                </Badge>
               </div>
-            )}
-            {choiData.by_kpi && Object.keys(choiData.by_kpi).length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      <th className="px-2 py-1">KPI</th>
-                      <th className="px-2 py-1">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(choiData.by_kpi).map(([k, v]) => (
-                      <tr key={k} className="border-t">
-                        <td className="px-2 py-1 whitespace-nowrap">{k}</td>
-                        <td className="px-2 py-1">
-                          {(v && v.status) || "N/A"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {Array.isArray(choiData.warnings) &&
-              choiData.warnings.length > 0 && (
-                <div className="text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-2">
-                  경고: {choiData.warnings.join(", ")}
+
+              {/* 판정 사유 */}
+              {Array.isArray(choiData.reasons) &&
+                choiData.reasons.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      판정 사유
+                    </div>
+                    <ul className="list-disc pl-5 space-y-1">
+                      {choiData.reasons.map((reason, idx) => (
+                        <li key={idx} className="text-sm text-muted-foreground">
+                          {typeof reason === "string"
+                            ? reason
+                            : JSON.stringify(reason)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {/* KPI별 상세 판정 */}
+              {choiData.by_kpi && Object.keys(choiData.by_kpi).length > 0 && (
+                <div>
+                  <div className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    KPI별 상세 판정
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border rounded-lg">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">
+                            KPI
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            상태
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            임계값
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            실제 변화
+                          </th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            심각도
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(choiData.by_kpi).map(
+                          ([kpiName, kpiData]) => (
+                            <tr key={kpiName} className="border-t">
+                              <td className="px-3 py-2 font-medium">
+                                {kpiName}
+                              </td>
+                              <td className="px-3 py-2">
+                                <Badge
+                                  variant={getStatusBadgeVariant(
+                                    kpiData.status
+                                  )}
+                                >
+                                  {getStatusText(kpiData.status)}
+                                </Badge>
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">
+                                {kpiData.evidence?.threshold || "N/A"}
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">
+                                {kpiData.evidence?.actual_change || "N/A"}
+                              </td>
+                              <td className="px-3 py-2">
+                                <Badge
+                                  variant={
+                                    kpiData.evidence?.severity === "high"
+                                      ? "destructive"
+                                      : kpiData.evidence?.severity === "medium"
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                >
+                                  {kpiData.evidence?.severity || "N/A"}
+                                </Badge>
+                              </td>
+                            </tr>
+                          )
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
-          </div>
-        )}
-        {!choiLoading && !choiData && (
-          <div className="text-center py-8">
-            <div className="relative mb-4">
-              <Brain className="h-12 w-12 text-purple-400 mx-auto" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full animate-pulse"></div>
+
+              {/* 이상 탐지 정보 */}
+              {choiData.abnormal_detection && (
+                <div>
+                  <div className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    이상 탐지 정보
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {choiData.abnormal_detection.detected_anomalies || 0}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        탐지된 이상
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {(
+                          (choiData.abnormal_detection.confidence_score || 0) *
+                          100
+                        ).toFixed(1)}
+                        %
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        신뢰도
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-medium">
+                        {Array.isArray(
+                          choiData.abnormal_detection.anomaly_types
+                        )
+                          ? choiData.abnormal_detection.anomaly_types.length
+                          : 0}
+                        개 유형
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        이상 유형
+                      </div>
+                    </div>
+                  </div>
+                  {Array.isArray(choiData.abnormal_detection.anomaly_types) &&
+                    choiData.abnormal_detection.anomaly_types.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {choiData.abnormal_detection.anomaly_types.map(
+                          (type, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {type}
+                            </Badge>
+                          )
+                        )}
+                      </div>
+                    )}
+                </div>
+              )}
+
+              {/* 경고 메시지 */}
+              {Array.isArray(choiData.warnings) &&
+                choiData.warnings.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      경고 메시지
+                    </div>
+                    <div className="space-y-2">
+                      {choiData.warnings.map((warning, idx) => (
+                        <div
+                          key={idx}
+                          className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded p-3"
+                        >
+                          {warning}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* 알고리즘 정보 */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-4 border-t">
+                <div>
+                  {choiData.algorithm_version && (
+                    <span>알고리즘 버전: {choiData.algorithm_version}</span>
+                  )}
+                </div>
+                <div>
+                  {choiData.processing_time_ms && (
+                    <span>처리 시간: {choiData.processing_time_ms}ms</span>
+                  )}
+                </div>
+              </div>
             </div>
-            <h3 className="text-lg font-semibold mb-2">알고리즘 실행 대기</h3>
-            <p className="text-muted-foreground mb-4">
-              버튼을 눌러 Choi 알고리즘 판정을 실행하세요.
-            </p>
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-              <p className="text-purple-800 dark:text-purple-200 text-sm">
-                <strong>현재 상태:</strong> {choiAlgorithmResult}
+          ) : choiAlgorithmResult === "error" ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2 text-red-600">
+                Choi 알고리즘 오류
+              </h3>
+              <p className="text-muted-foreground">
+                Choi 알고리즘 데이터를 불러오는 중 오류가 발생했습니다.
               </p>
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          ) : choiAlgorithmResult === "absent" ? (
+            <div className="text-center py-8">
+              <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">
+                Choi 알고리즘 미사용
+              </h3>
+              <p className="text-muted-foreground">
+                이 분석에서는 Choi 알고리즘이 사용되지 않았습니다.
+              </p>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-purple-600 mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                Choi 알고리즘 데이터를 불러오는 중...
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   // === 마할라노비스 거리 알고리즘 결과 렌더링 ===
   const renderMahalanobisResult = () => {
     console.log("🎨 마할라노비스 렌더링 상태:", {
       mahalanobisResult,
       loading,
-      resultsLength: results.length,
+      resultsLength: safeResults.length,
     });
+
+    // Promise 객체인 경우 처리
+    if (mahalanobisResult && typeof mahalanobisResult.then === "function") {
+      return (
+        <Card className="border-l-4 border-l-blue-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              마할라노비스 분석 중...
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              마할라노비스 거리 분석을 수행하고 있습니다. 잠시만 기다려주세요.
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
 
     if (!mahalanobisResult) {
       return (
@@ -2375,7 +2771,7 @@ const ResultDetail = ({
       );
     }
 
-    if (mahalanobisResult.error) {
+    if (mahalanobisResult?.error) {
       return (
         <Card className="border-l-4 border-l-red-500">
           <CardHeader>
@@ -2475,39 +2871,40 @@ const ResultDetail = ({
               <div>
                 <span className="text-muted-foreground">총 KPI 수:</span>
                 <div className="font-medium">
-                  {mahalanobisResult.totalKpis}개
+                  {mahalanobisResult.totalKpis || 0}개
                 </div>
               </div>
               <div>
                 <span className="text-muted-foreground">이상 KPI 수:</span>
                 <div className="font-medium">
-                  {mahalanobisResult.abnormalKpis.length}개
+                  {mahalanobisResult.abnormalKpis?.length || 0}개
                 </div>
               </div>
               <div>
                 <span className="text-muted-foreground">이상 점수:</span>
                 <div className="font-medium">
-                  {(mahalanobisResult.abnormalScore * 100).toFixed(1)}%
+                  {((mahalanobisResult.abnormalScore || 0) * 100).toFixed(1)}%
                 </div>
               </div>
             </div>
             <div className="mt-2 text-sm">
               <span className="text-muted-foreground">판정:</span>
               <span className="ml-1">
-                {mahalanobisResult.analysis.screening.description}
+                {mahalanobisResult.analysis?.screening?.description ||
+                  "분석 중..."}
               </span>
             </div>
           </div>
 
           {/* 이상 KPI 목록 */}
-          {mahalanobisResult.abnormalKpis.length > 0 && (
+          {mahalanobisResult.abnormalKpis?.length > 0 && (
             <div>
               <h4 className="font-semibold mb-3 flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 이상 감지된 KPI 목록
               </h4>
               <div className="space-y-2">
-                {mahalanobisResult.abnormalKpis.slice(0, 5).map((kpi, idx) => (
+                {mahalanobisResult.abnormalKpis?.slice(0, 5).map((kpi, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
@@ -3054,6 +3451,35 @@ const ResultDetail = ({
     );
   };
 
+  // === 디버깅 정보 표시 컴포넌트 ===
+  const DebugInfo = ({ component, hooks = [], description = "" }) => {
+    if (!isTemplateMode) return null;
+
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Info className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-800">디버깅 정보</span>
+        </div>
+        <div className="text-xs text-blue-700 space-y-1">
+          <div>
+            <strong>컴포넌트:</strong> {component}
+          </div>
+          {hooks.length > 0 && (
+            <div>
+              <strong>사용된 훅:</strong> {hooks.join(", ")}
+            </div>
+          )}
+          {description && (
+            <div>
+              <strong>설명:</strong> {description}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   // === 모달 컨텐츠 ===
   const renderContent = () => {
     if (loading) {
@@ -3121,37 +3547,56 @@ const ResultDetail = ({
       <div className="space-y-6">
         {/* 기본 정보 요약 */}
         <div className="space-y-6">
+          <DebugInfo
+            component={
+              isCompareMode ? "renderCompareHeader()" : "renderSingleOverview()"
+            }
+            hooks={["useMemo", "formatDate", "getStatusBadgeVariant"]}
+            description={
+              isCompareMode
+                ? "다중 결과 비교 헤더를 표시하는 컴포넌트"
+                : "단일 결과 개요 정보를 표시하는 컴포넌트"
+            }
+          />
           {isCompareMode
             ? renderCompareHeader()
             : renderSingleOverview(processedResults[0])}
         </div>
 
-        {/* LLM 분석 리포트 (최우선) */}
+        {/* Choi 알고리즘 결과 (최우선) */}
+        <AnalysisSection
+          title={
+            <span className="inline-flex items-center gap-2">
+              Choi 알고리즘 판정
+              {choiData?.overall && (
+                <AnalysisStatusIndicator status={choiData.overall} />
+              )}
+            </span>
+          }
+          defaultOpen
+          data-testid="section-choi"
+        >
+          <DebugInfo
+            component="renderChoiAlgorithmResult()"
+            hooks={["useState", "useEffect", "useCallback"]}
+            description="Choi 알고리즘 판정 결과를 표시하는 컴포넌트. choi_judgement 데이터를 기반으로 전체 판정, KPI별 상세 판정, 이상 탐지 정보를 표시합니다."
+          />
+          {renderChoiAlgorithmResult()}
+        </AnalysisSection>
+
+        {/* LLM 분석 리포트 */}
         <AnalysisSection
           title="LLM 분석 리포트"
           defaultOpen
           data-testid="section-llm"
         >
+          <DebugInfo
+            component="renderLLMReport()"
+            hooks={["useMemo", "extractAnalysisData", "extractSummaryText"]}
+            description="LLM 분석 결과를 표시하는 컴포넌트. executive_summary, diagnostic_findings, recommended_actions 등의 데이터를 구조화하여 표시합니다."
+          />
           {renderLLMReport(processedResults)}
         </AnalysisSection>
-
-        {/* Choi 알고리즘 결과 */}
-        {choiData && (
-          <AnalysisSection
-            title={
-              <span className="inline-flex items-center gap-2">
-                Choi 알고리즘 판정
-                {choiData?.overall && (
-                  <AnalysisStatusIndicator status={choiData.overall} />
-                )}
-              </span>
-            }
-            defaultOpen
-            data-testid="section-choi"
-          >
-            {renderChoiAlgorithmResult()}
-          </AnalysisSection>
-        )}
 
         {/* 마할라노비스 거리 분석 */}
         {mahalanobisResult && (
@@ -3160,6 +3605,11 @@ const ResultDetail = ({
             defaultOpen
             data-testid="section-mahalanobis"
           >
+            <DebugInfo
+              component="renderMahalanobisResult()"
+              hooks={["useState", "useEffect", "calculateMahalanobisDistance"]}
+              description="마할라노비스 거리 분석 결과를 표시하는 컴포넌트. 종합 건강 상태, 이상 KPI 목록, 2차 심층 분석 결과를 표시합니다."
+            />
             {renderMahalanobisResult()}
           </AnalysisSection>
         )}
@@ -3171,6 +3621,15 @@ const ResultDetail = ({
             defaultOpen
             data-testid="section-peg"
           >
+            <DebugInfo
+              component="PEGAnalysisDisplay"
+              hooks={[
+                "usePegPreferences",
+                "useDashboardSettings",
+                "calculatePegComparison",
+              ]}
+              description="PEG 성능 비교 분석을 표시하는 컴포넌트. KPI별 성능 변화, 가중치 기반 분석, 차트 및 테이블 형태로 데이터를 표시합니다."
+            />
             <PEGAnalysisDisplay results={pegComparisonResult} />
           </AnalysisSection>
         )}
@@ -3615,7 +4074,11 @@ const ResultDetail = ({
             <div className="flex items-center justify-between">
               <DialogTitle className="flex items-center gap-2">
                 <Eye className="h-5 w-5" />
-                {isCompareMode ? "분석 결과 비교" : "분석 결과 상세"}
+                {isTemplateMode
+                  ? "🎨 분석 결과 템플릿 (디버깅용)"
+                  : isCompareMode
+                  ? "분석 결과 비교"
+                  : "분석 결과 상세"}
               </DialogTitle>
               <div className="flex items-center gap-2">
                 {/* ✅ 세로로만 확대하는 버튼 */}

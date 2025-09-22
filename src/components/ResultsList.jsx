@@ -52,6 +52,7 @@ import {
   ChevronDown,
   X,
   Search,
+  Layout,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAnalysisResults } from "@/hooks/useAnalysisResults.js";
@@ -364,6 +365,208 @@ const ResultsList = () => {
     }
   }, [logInfo]);
 
+  // === 디버깅용 템플릿 데이터 생성 ===
+  const createTemplateData = useCallback(() => {
+    const now = new Date();
+    const templateResult = {
+      id: "template-debug-001",
+      analysisDate: now.toISOString(),
+      neId: "NE_TEMPLATE_001",
+      cellId: "CELL_TEMPLATE_001",
+      status: "success",
+      llmModel: "gpt-4-turbo",
+      metadata: {
+        workflow_version: "3.0",
+        processing_timestamp: now.toISOString(),
+        request_id: "req_template_debug",
+        enable_mock: false,
+        data_processor: true,
+        use_choi: true,
+      },
+      choi_judgement: {
+        overall: "OK",
+        reasons: [
+          "Most KPIs within normal range",
+          "Minor degradation in DL throughput",
+          "Network performance stable overall",
+        ],
+        by_kpi: {
+          AirMacDLThruAvg: {
+            status: "POK",
+            evidence: {
+              threshold: 10.0,
+              actual_change: -5.82,
+              severity: "medium",
+            },
+          },
+          Random_access_preamble_count: {
+            status: "OK",
+            evidence: {
+              threshold: 15.0,
+              actual_change: 10.4,
+              severity: "low",
+            },
+          },
+          UL_throughput_avg: {
+            status: "OK",
+            evidence: {
+              threshold: 8.0,
+              actual_change: 2.1,
+              severity: "low",
+            },
+          },
+        },
+        abnormal_detection: {
+          detected_anomalies: 2,
+          anomaly_types: ["throughput_degradation", "latency_spike"],
+          confidence_score: 0.85,
+        },
+        warnings: [
+          "DL throughput shows consistent decline pattern",
+          "Monitor for potential network congestion",
+        ],
+        algorithm_version: "choi-v1.2",
+        processing_time_ms: 245,
+      },
+      data: {
+        analysis: {
+          executive_summary:
+            "네트워크 성능 분석 결과, 전반적으로 안정적인 상태를 유지하고 있으나 DL throughput에서 경미한 성능 저하가 관찰됩니다. 이는 일시적인 트래픽 증가로 인한 것으로 판단되며, 지속적인 모니터링이 필요합니다.",
+          overall_summary:
+            "분석 기간 동안 대부분의 KPI가 정상 범위 내에서 동작하고 있습니다. AirMacDLThruAvg에서 5.82%의 성능 저하가 감지되었으나, 이는 임계값(10%) 이하로 경미한 수준입니다.",
+          diagnostic_findings: [
+            {
+              primary_hypothesis:
+                "DL throughput 성능 저하가 주요 관찰 사항입니다",
+              supporting_evidence: "AirMacDLThruAvg KPI에서 -5.82% 변화율 관찰",
+              confounding_factors_assessment:
+                "네트워크 트래픽 증가와 관련된 일시적 현상으로 판단",
+            },
+            {
+              primary_hypothesis:
+                "UL throughput은 정상 범위 내에서 안정적입니다",
+              supporting_evidence: "UL_throughput_avg에서 +2.1% 개선 관찰",
+              confounding_factors_assessment:
+                "사용자 활동 패턴의 정상적인 변화",
+            },
+          ],
+          recommended_actions: [
+            {
+              priority: "High",
+              action: "DL throughput 모니터링 강화",
+              details:
+                "향후 24시간 동안 AirMacDLThruAvg KPI를 집중 모니터링하고, 추가 성능 저하 시 즉시 대응",
+            },
+            {
+              priority: "Medium",
+              action: "네트워크 용량 검토",
+              details: "현재 트래픽 패턴을 분석하여 용량 증설 필요성 검토",
+            },
+            {
+              priority: "Low",
+              action: "정기 성능 리포트 생성",
+              details: "주간 성능 트렌드 리포트를 통한 장기적 패턴 분석",
+            },
+          ],
+        },
+      },
+      kpiResults: {
+        AirMacDLThruAvg: { "N-1": 85.2, N: 80.3, weight: 8 },
+        Random_access_preamble_count: { "N-1": 120.5, N: 133.1, weight: 6 },
+        UL_throughput_avg: { "N-1": 45.8, N: 46.8, weight: 7 },
+        DL_throughput_avg: { "N-1": 92.1, N: 88.5, weight: 9 },
+        Connection_success_rate: { "N-1": 98.5, N: 98.2, weight: 8 },
+      },
+      stats: [
+        {
+          kpi_name: "AirMacDLThruAvg",
+          period: "N-1",
+          avg: 85.2,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "AirMacDLThruAvg",
+          period: "N",
+          avg: 80.3,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Random_access_preamble_count",
+          period: "N-1",
+          avg: 120.5,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Random_access_preamble_count",
+          period: "N",
+          avg: 133.1,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "UL_throughput_avg",
+          period: "N-1",
+          avg: 45.8,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "UL_throughput_avg",
+          period: "N",
+          avg: 46.8,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "DL_throughput_avg",
+          period: "N-1",
+          avg: 92.1,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "DL_throughput_avg",
+          period: "N",
+          avg: 88.5,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Connection_success_rate",
+          period: "N-1",
+          avg: 98.5,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+        {
+          kpi_name: "Connection_success_rate",
+          period: "N",
+          avg: 98.2,
+          cell_id: "CELL_TEMPLATE_001",
+        },
+      ],
+      request_params: {
+        peg_definitions: {
+          AirMacDLThruAvg: { weight: 8 },
+          Random_access_preamble_count: { weight: 6 },
+          UL_throughput_avg: { weight: 7 },
+          DL_throughput_avg: { weight: 9 },
+          Connection_success_rate: { weight: 8 },
+        },
+      },
+    };
+
+    return [templateResult];
+  }, []);
+
+  // === 템플릿 모달 열기 ===
+  const handleShowTemplate = useCallback(() => {
+    try {
+      logInfo("템플릿 모달 열기");
+      setDetailModal({
+        isOpen: true,
+        resultIds: ["template-debug-001"],
+        mode: "template",
+      });
+    } catch (error) {
+      logInfo("템플릿 모달 열기 오류", { error });
+    }
+  }, [logInfo]);
+
   // === 데이터 내보내기 (안전한 처리) ===
   const handleExport = useCallback(() => {
     try {
@@ -541,6 +744,16 @@ const ResultsList = () => {
               </AlertDialog>
             </>
           )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShowTemplate}
+            className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+          >
+            <Layout className="h-4 w-4 mr-2" />
+            Template
+          </Button>
 
           <Button
             variant="outline"

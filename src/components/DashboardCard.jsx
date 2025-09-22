@@ -142,39 +142,39 @@ const DashboardCard = ({
 
   return (
     <Card key={`${chartKey}-${idx}`} className={cardClassName}>
-      {/* PEG명을 카드 상단에 고정 */}
-      <div className="px-6 py-3 border-b bg-muted/30">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-foreground">
-            {titleFor(title)}
-          </h3>
-          <div className="flex items-center gap-2">
-            {enableTimeComparison && (
-              <Badge
-                variant="default"
-                className="text-xs bg-blue-100 text-blue-800"
-              >
-                Time1/Time2 비교
-              </Badge>
-            )}
-            <Badge variant="outline" className="text-xs">
-              {entities.length}개 시리즈
-            </Badge>
-            <Badge variant="secondary" className="text-xs">
-              {chartData?.length || 0}개 데이터포인트
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      {/* 차트 영역 - 최대한 크게 확장 */}
+      {/* 차트 영역 - PEG명을 차트 내부 상단에 표시 */}
       <CardContent className="p-0">
         <div
-          className={`${enableTimeComparison ? "h-80" : "h-72"} cursor-zoom-in`}
+          className={`${
+            enableTimeComparison ? "h-80" : "h-72"
+          } cursor-zoom-in relative`}
           onClick={() =>
             onZoom({ open: true, title: titleFor(title), data: chartData })
           }
         >
+          {/* PEG명을 차트 내부 상단에 오버레이로 표시 */}
+          <div className="absolute top-2 left-2 z-10 bg-background/90 backdrop-blur-sm rounded-md px-2 py-1 border shadow-sm">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-foreground">
+                {titleFor(title)}
+              </h3>
+              {enableTimeComparison && (
+                <Badge
+                  variant="default"
+                  className="text-xs bg-blue-100 text-blue-800"
+                >
+                  Time1/Time2 비교
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs">
+                {entities.length}개 시리즈
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                {chartData?.length || 0}개 데이터포인트
+              </Badge>
+            </div>
+          </div>
+
           <DashboardChart
             chartData={chartData}
             chartKey={chartKey}

@@ -271,6 +271,7 @@ const DashboardChart = ({
   const chartProps = {
     data: chartData,
     className: enableTimeComparison ? "h-80" : "h-72",
+    margin: { top: 40, right: 30, left: 20, bottom: 20 }, // 상단 여백 추가
   };
 
   // X축 틱 포맷터 - 이미 포맷팅된 시간을 그대로 표시
