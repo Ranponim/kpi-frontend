@@ -87,7 +87,10 @@ import {
   Info,
 } from "lucide-react";
 import { toast } from "sonner";
-import apiClient, { getDetailedResult } from "@/lib/apiClient.js";
+import apiClient, {
+  getDetailedResult,
+  getPEGComparisonResult,
+} from "@/lib/apiClient.js";
 import AnalysisSection from "./AnalysisSection.jsx";
 import AnalysisStatusIndicator from "./AnalysisStatusIndicator.jsx";
 import PEGAnalysisDisplay from "./PEGAnalysisDisplay.jsx";
@@ -110,6 +113,8 @@ const ResultDetail = ({
   const [choiAlgorithmResult, setChoiAlgorithmResult] = useState("absent"); // Choi 알고리즘 결과
   const [mahalanobisResult, setMahalanobisResult] = useState(null); // 마할라노비스 거리 결과
   const [pegComparisonResult, setPegComparisonResult] = useState(null); // PEG 비교 결과
+  const [pegComparisonLoading, setPegComparisonLoading] = useState(false); // PEG 비교분석 로딩 상태
+  const [pegComparisonError, setPegComparisonError] = useState(null); // PEG 비교분석 에러 상태
 
   const [choiData, setChoiData] = useState(null);
 
@@ -915,107 +920,48 @@ const ResultDetail = ({
     }
   }, []);
 
-  // === PEG 비교 결과 계산 함수 ===
-  const calculatePegComparison = useCallback((result) => {
+  // === PEG 비교분석 결과 파싱 함수 (MCP에서 받은 데이터 처리) ===
+  const parsePEGComparisonResponse = useCallback((apiResponse) => {
     try {
-      console.log("📊 PEG 비교 결과 계산 시작", result);
+      console.log("📊 PEG 비교분석 응답 파싱 시작", apiResponse);
 
-      if (!result?.stats || !Array.isArray(result.stats)) {
-        return null;
+      if (!apiResponse.success) {
+        throw new Error(
+          `API 오류: ${apiResponse.error?.message || "알 수 없는 오류"}`
+        );
       }
 
-      const stats = result.stats;
-      const pegResults = {};
+      const { data } = apiResponse;
 
-      // PEG별로 N-1과 N 기간 데이터 그룹화
-      stats.forEach((stat) => {
-        const pegName = stat.kpi_name;
-        if (!pegResults[pegName]) {
-          pegResults[pegName] = {
-            peg_name: pegName,
-            n1_values: [],
-            n_values: [],
-            weight:
-              result.request_params?.peg_definitions?.[pegName]?.weight || 5,
-          };
-        }
-
-        if (stat.period === "N-1") {
-          pegResults[pegName].n1_values.push(stat.avg);
-        } else if (stat.period === "N") {
-          pegResults[pegName].n_values.push(stat.avg);
-        }
-      });
-
-      // 각 PEG에 대해 통계 계산
-      const comparisonResults = Object.values(pegResults).map((peg) => {
-        const n1Avg =
-          peg.n1_values.length > 0
-            ? peg.n1_values.reduce((a, b) => a + b, 0) / peg.n1_values.length
-            : 0;
-        const nAvg =
-          peg.n_values.length > 0
-            ? peg.n_values.reduce((a, b) => a + b, 0) / peg.n_values.length
-            : 0;
-
-        // RSD (Relative Standard Deviation) 계산
-        const n1Rsd =
-          peg.n1_values.length > 1
-            ? (Math.sqrt(
-                peg.n1_values.reduce(
-                  (sum, val) => sum + Math.pow(val - n1Avg, 2),
-                  0
-                ) /
-                  (peg.n1_values.length - 1)
-              ) /
-                Math.abs(n1Avg)) *
-              100
-            : 0;
-
-        const nRsd =
-          peg.n_values.length > 1
-            ? (Math.sqrt(
-                peg.n_values.reduce(
-                  (sum, val) => sum + Math.pow(val - nAvg, 2),
-                  0
-                ) /
-                  (peg.n_values.length - 1)
-              ) /
-                Math.abs(nAvg)) *
-              100
-            : 0;
-
-        // 변화율 계산
-        const changePercent = n1Avg !== 0 ? ((nAvg - n1Avg) / n1Avg) * 100 : 0;
-        const trend =
-          changePercent > 5 ? "up" : changePercent < -5 ? "down" : "stable";
-
-        return {
-          ...peg,
-          n1_avg: n1Avg,
-          n_avg: nAvg,
-          n1_rsd: n1Rsd,
-          n_rsd: nRsd,
-          change_percent: changePercent,
-          trend,
-          significance:
-            Math.abs(changePercent) > 10
-              ? "high"
-              : Math.abs(changePercent) > 5
-              ? "medium"
-              : "low",
-        };
-      });
+      // MCP에서 받은 데이터를 프론트엔드 형식으로 변환
+      const pegResults = data.peg_comparison_results.map((peg) => ({
+        peg_name: peg.peg_name,
+        weight: peg.weight,
+        n1_avg: peg.n1_period.avg,
+        n_avg: peg.n_period.avg,
+        n1_rsd: peg.n1_period.rsd,
+        n_rsd: peg.n_period.rsd,
+        change_percent: peg.comparison.change_percent,
+        trend: peg.comparison.trend,
+        significance: peg.comparison.significance,
+        // 추가 메타데이터
+        n1_values: peg.n1_period.values,
+        n_values: peg.n_period.values,
+        confidence: peg.comparison.confidence,
+        cell_id: peg.metadata.cell_id,
+        calculated_at: peg.metadata.calculated_at,
+        data_quality: peg.metadata.data_quality,
+      }));
 
       // 가중치 기준으로 정렬
-      const sortedResults = comparisonResults.sort(
+      const sortedResults = pegResults.sort(
         (a, b) => (b.weight || 0) - (a.weight || 0)
       );
 
-      console.log("✅ PEG 비교 결과 계산 완료", sortedResults);
+      console.log("✅ PEG 비교분석 응답 파싱 완료", sortedResults);
       return sortedResults;
     } catch (error) {
-      console.error("❌ PEG 비교 결과 계산 실패", error);
+      console.error("❌ PEG 비교분석 응답 파싱 실패", error);
       return null;
     }
   }, []);
@@ -1040,6 +986,8 @@ const ResultDetail = ({
     setChoiAlgorithmResult("absent");
     setMahalanobisResult(null);
     setPegComparisonResult(null);
+    setPegComparisonLoading(false);
+    setPegComparisonError(null);
     setPegPage(0);
     setPegPageSize(10);
     setPegFilter("");
@@ -1140,26 +1088,47 @@ const ResultDetail = ({
     }
   }, [safeResults, calculateMahalanobisDistance, mahalanobisResult]); // safeResults 사용
 
-  // === PEG 비교 분석 수행 ===
-  const performPegComparisonAnalysis = useCallback(() => {
-    // 현재 results를 직접 참조하여 초기화 순서 문제 방지
-    const currentProcessedResults = safeResults.filter((r) => !r.error);
+  // === PEG 비교분석 결과 조회 ===
+  const fetchPEGComparisonResult = useCallback(
+    async (resultId) => {
+      if (!resultId) {
+        console.log("📊 PEG 비교분석: 결과 ID가 없습니다");
+        return;
+      }
 
-    if (!currentProcessedResults.length || !currentProcessedResults[0].stats) {
-      console.log("📊 PEG 비교 분석: 데이터가 부족합니다");
-      return;
-    }
+      setPegComparisonLoading(true);
+      setPegComparisonError(null);
 
-    try {
-      console.log("📊 PEG 비교 분석 시작");
-      const result = calculatePegComparison(currentProcessedResults[0]);
-      console.log("✅ PEG 비교 분석 완료:", result);
-      setPegComparisonResult(result);
-    } catch (error) {
-      console.error("❌ PEG 비교 분석 실패:", error);
-      setPegComparisonResult(null);
-    }
-  }, [safeResults]); // safeResults 사용
+      try {
+        console.log("📊 PEG 비교분석 결과 조회 시작:", resultId);
+
+        // 새로운 API를 통해 MCP에서 계산된 결과 조회
+        const response = await getPEGComparisonResult(resultId);
+
+        // 응답 데이터 파싱
+        const parsedResult = parsePEGComparisonResponse(response);
+
+        if (parsedResult) {
+          console.log("✅ PEG 비교분석 결과 조회 완료:", parsedResult);
+          setPegComparisonResult(parsedResult);
+          setPegComparisonError(null);
+        } else {
+          console.warn("⚠️ PEG 비교분석 결과 파싱 실패");
+          setPegComparisonResult(null);
+          setPegComparisonError("결과 파싱에 실패했습니다");
+        }
+      } catch (error) {
+        console.error("❌ PEG 비교분석 결과 조회 실패:", error);
+        setPegComparisonResult(null);
+        setPegComparisonError(
+          error.message || "PEG 비교분석 결과를 불러올 수 없습니다"
+        );
+      } finally {
+        setPegComparisonLoading(false);
+      }
+    },
+    [parsePEGComparisonResponse]
+  );
 
   // === Effect: 데이터 로딩 완료 후 분석 수행 ===
   useEffect(() => {
@@ -1172,14 +1141,17 @@ const ResultDetail = ({
       // 마할라노비스 분석 수행 (비동기)
       performMahalanobisAnalysis();
 
-      // PEG 비교 분석 수행 (동기)
-      performPegComparisonAnalysis();
+      // PEG 비교분석 결과 조회 (MCP에서 계산된 결과)
+      const firstResult = currentProcessedResults[0];
+      if (firstResult?.id) {
+        fetchPEGComparisonResult(firstResult.id);
+      }
     }
   }, [
     safeResults,
     loading,
     performMahalanobisAnalysis,
-    performPegComparisonAnalysis,
+    fetchPEGComparisonResult,
   ]); // safeResults 사용
 
   // === 템플릿 모드에서 분석 강제 실행 ===
@@ -1188,14 +1160,19 @@ const ResultDetail = ({
       console.log("🎨 템플릿 모드: 분석 강제 실행");
       // 템플릿 모드에서는 모든 분석을 강제로 실행
       performMahalanobisAnalysis();
-      performPegComparisonAnalysis();
+
+      // PEG 비교분석 결과 조회
+      const firstResult = safeResults.filter((r) => !r.error)[0];
+      if (firstResult?.id) {
+        fetchPEGComparisonResult(firstResult.id);
+      }
     }
   }, [
     isTemplateMode,
     safeResults,
     loading,
     performMahalanobisAnalysis,
-    performPegComparisonAnalysis,
+    fetchPEGComparisonResult,
   ]);
 
   // === Effect: 모달이 닫힐 때 상태 정리 ===
@@ -1291,10 +1268,9 @@ const ResultDetail = ({
         setMahalanobisResult({ error: "분석 데이터가 없습니다" });
       }
 
-      // PEG 비교 결과 계산
-      if (firstResult?.stats) {
-        const pegResult = calculatePegComparison(firstResult);
-        setPegComparisonResult(pegResult);
+      // PEG 비교분석 결과 조회 (MCP에서 계산된 결과)
+      if (firstResult?.id) {
+        fetchPEGComparisonResult(firstResult.id);
       }
     } else {
       console.log("⏳ 마할라노비스 분석 대기 중:", {
@@ -1302,7 +1278,12 @@ const ResultDetail = ({
         isLoading: loading,
       });
     }
-  }, [results, loading, calculateMahalanobisDistance, calculatePegComparison]);
+  }, [
+    results,
+    loading,
+    calculateMahalanobisDistance,
+    fetchPEGComparisonResult,
+  ]);
 
   // === 상태별 뱃지 색상 ===
   const getStatusBadgeVariant = (status) => {
@@ -3645,8 +3626,10 @@ const ResultDetail = ({
           </AnalysisSection>
         )}
 
-        {/* PEG 비교 분석 (Preference 연동 예정) */}
-        {pegComparisonResult && (
+        {/* PEG 비교 분석 (MCP에서 계산된 결과 조회) */}
+        {(pegComparisonResult ||
+          pegComparisonLoading ||
+          pegComparisonError) && (
           <AnalysisSection
             title="PEG 비교 분석"
             defaultOpen
@@ -3657,11 +3640,46 @@ const ResultDetail = ({
               hooks={[
                 "usePegPreferences",
                 "useDashboardSettings",
-                "calculatePegComparison",
+                "getPEGComparisonResult",
               ]}
-              description="PEG 성능 비교 분석을 표시하는 컴포넌트. KPI별 성능 변화, 가중치 기반 분석, 차트 및 테이블 형태로 데이터를 표시합니다."
+              description="PEG 성능 비교 분석을 표시하는 컴포넌트. MCP에서 계산된 결과를 조회하여 KPI별 성능 변화, 가중치 기반 분석, 차트 및 테이블 형태로 데이터를 표시합니다."
             />
-            <PEGAnalysisDisplay results={pegComparisonResult} />
+
+            {/* 로딩 상태 */}
+            {pegComparisonLoading && (
+              <div className="flex items-center justify-center p-8">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="text-sm text-muted-foreground">
+                    PEG 비교분석 결과를 불러오는 중...
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* 에러 상태 */}
+            {pegComparisonError && (
+              <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="text-red-500 mb-2">
+                    <AlertCircle className="h-8 w-8 mx-auto" />
+                  </div>
+                  <p className="text-sm text-red-600 mb-2">
+                    PEG 비교분석 결과를 불러올 수 없습니다
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {pegComparisonError}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* 성공 상태 */}
+            {pegComparisonResult &&
+              !pegComparisonLoading &&
+              !pegComparisonError && (
+                <PEGAnalysisDisplay results={pegComparisonResult} />
+              )}
           </AnalysisSection>
         )}
       </div>

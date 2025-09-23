@@ -65,6 +65,10 @@ const getBaseURL = () => {
     // 환경변수 우선순위: Vite 환경변수 > 런타임 설정 > 기본값
     let baseURL = null;
 
+    // 런타임 설정을 함수 상단에서 정의 (전체 함수에서 접근 가능)
+    const runtimeCfg =
+      typeof window !== "undefined" ? window.__RUNTIME_CONFIG__ || {} : {};
+
     // 1. Vite 환경변수 우선 확인 (최고 우선순위)
     if (import.meta.env.VITE_API_BASE_URL) {
       baseURL = import.meta.env.VITE_API_BASE_URL;
@@ -77,9 +81,6 @@ const getBaseURL = () => {
 
     // 2. 런타임 설정 확인 (Docker 환경에서 사용)
     if (!baseURL) {
-      const runtimeCfg =
-        typeof window !== "undefined" ? window.__RUNTIME_CONFIG__ || {} : {};
-
       if (
         runtimeCfg.VITE_API_BASE_URL &&
         String(runtimeCfg.VITE_API_BASE_URL).trim()
@@ -270,7 +271,7 @@ export const runChoiAnalysis = async (payload) => {
   });
 
   try {
-    const response = await apiClient.post("/api/kpi/choi-analysis", payload);
+    const response = await apiClient.post("/kpi/choi-analysis", payload);
     logApiClient("info", "Choi 알고리즘 요청 성공", {
       keys: Object.keys(response.data || {}),
     });
@@ -291,7 +292,7 @@ export const getAnalysisResults = async (params = {}) => {
   logApiClient("info", "분석 결과 목록 조회", { params });
 
   try {
-    const response = await apiClient.get("/api/analysis/results", { params });
+    const response = await apiClient.get("/analysis/results", { params });
 
     logApiClient("info", "분석 결과 목록 조회 성공", {
       resultCount: response.data?.results?.length || 0,
@@ -345,7 +346,7 @@ export const getDetailedResult = async (id) => {
       throw new Error("유효하지 않은 분석 결과 ID입니다.");
     }
 
-    const response = await apiClient.get(`/api/analysis/results/${id}`);
+    const response = await apiClient.get(`/analysis/results/${id}`);
 
     // 응답 데이터 검증
     if (!response.data) {
@@ -416,6 +417,73 @@ export const getDetailedResult = async (id) => {
 };
 
 // ================================
+// PEG 비교분석 API 함수들
+// ================================
+
+/**
+ * PEG 비교분석 결과 조회
+ * @param {string} resultId - 분석 결과 ID
+ * @returns {Promise<Object>} PEG 비교분석 결과
+ */
+export const getPEGComparisonResult = async (resultId) => {
+  try {
+    logApiClient("info", `PEG 비교분석 결과 조회 시작: ${resultId}`);
+
+    const response = await apiClient.get(
+      `/analysis/results/${resultId}/peg-comparison`
+    );
+
+    logApiClient("info", "PEG 비교분석 결과 조회 성공", {
+      resultId,
+      cached: response.data.cached,
+      processingTime: response.data.processing_time,
+    });
+
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "PEG 비교분석 결과 조회 실패", {
+      resultId,
+      error: error.message,
+      status: error.response?.status,
+    });
+
+    // 사용자 친화적인 에러 메시지
+    let userMessage = "PEG 비교분석 결과를 불러올 수 없습니다";
+    if (error.response?.status === 404) {
+      userMessage = "분석 결과를 찾을 수 없습니다";
+    } else if (error.response?.status === 500) {
+      userMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요";
+    }
+
+    toast.error(userMessage);
+    throw error;
+  }
+};
+
+/**
+ * PEG 비교분석 비동기 작업 상태 조회
+ * @param {string} resultId - 분석 결과 ID
+ * @returns {Promise<Object>} 작업 상태 정보
+ */
+export const getPEGComparisonStatus = async (resultId) => {
+  try {
+    logApiClient("info", `PEG 비교분석 상태 조회: ${resultId}`);
+
+    const response = await apiClient.get(
+      `/api/analysis/results/${resultId}/peg-comparison/status`
+    );
+
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "PEG 비교분석 상태 조회 실패", {
+      resultId,
+      error: error.message,
+    });
+    throw error;
+  }
+};
+
+// ================================
 // 사용자 설정 동기화 API 함수들
 // ================================
 
@@ -428,7 +496,7 @@ export const getUserPreferences = async (userId = "default") => {
   logApiClient("info", "사용자 설정 조회", { userId });
 
   try {
-    const response = await apiClient.get("/api/preference/settings", {
+    const response = await apiClient.get("/preference/settings", {
       params: { user_id: userId },
     });
 
@@ -467,7 +535,7 @@ export const saveUserPreferences = async (
 
   try {
     const response = await apiClient.put(
-      "/api/preference/settings",
+      "/preference/settings",
       preferenceData,
       {
         params: { user_id: userId },
@@ -544,7 +612,7 @@ export const exportUserPreferences = async (userId = "default") => {
   logApiClient("info", "사용자 설정 내보내기", { userId });
 
   try {
-    const response = await apiClient.get("/api/preference/export", {
+    const response = await apiClient.get("/preference/export", {
       params: { user_id: userId },
     });
 
@@ -582,7 +650,7 @@ export const importUserPreferences = async (
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await apiClient.post("/api/preference/import", formData, {
+    const response = await apiClient.post("/preference/import", formData, {
       params: { user_id: userId, overwrite },
       headers: {
         "Content-Type": "multipart/form-data",
