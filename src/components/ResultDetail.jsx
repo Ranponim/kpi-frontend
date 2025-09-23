@@ -1232,7 +1232,24 @@ const ResultDetail = ({
       const useChoi = metadata?.use_choi === true;
       console.log("🧠 Choi 알고리즘 사용 여부:", { useChoi, metadata });
 
-      if (useChoi) {
+      // 비교 모드에서는 모든 결과의 Choi 알고리즘 사용 여부를 확인
+      let hasAnyChoiData = false;
+      if (isCompareMode) {
+        hasAnyChoiData = currentProcessedResults.some((result) => {
+          const resultMetadata = result?.metadata || {};
+          return resultMetadata?.use_choi === true;
+        });
+        console.log("🔍 비교 모드 Choi 알고리즘 검사:", {
+          totalResults: currentProcessedResults.length,
+          hasAnyChoiData,
+          resultsWithChoi: currentProcessedResults.map((r) => ({
+            id: r.id,
+            use_choi: r?.metadata?.use_choi,
+          })),
+        });
+      }
+
+      if (useChoi || (isCompareMode && hasAnyChoiData)) {
         // choi_judgement 데이터 추출
         const choiJudgement = firstResult?.choi_judgement;
         if (choiJudgement) {
@@ -2441,7 +2458,11 @@ const ResultDetail = ({
               <CardTitle className="flex items-center gap-2">
                 <Brain className="h-5 w-5 text-purple-600" />
                 Choi 알고리즘 판정 결과
-                {choiData ? (
+                {isTemplateMode ? (
+                  <Badge variant="outline" className="text-blue-600">
+                    템플릿 데이터
+                  </Badge>
+                ) : choiData ? (
                   <Badge variant="outline" className="text-purple-600">
                     완료
                   </Badge>
@@ -2470,7 +2491,9 @@ const ResultDetail = ({
             </Button>
           </div>
           <CardDescription>
-            Choi 알고리즘 문서 기반의 품질 판정 결과를 표시합니다.
+            {isTemplateMode
+              ? "템플릿 모드: Choi 알고리즘의 예시 데이터를 표시합니다. (디버깅용)"
+              : "Choi 알고리즘 문서 기반의 품질 판정 결과를 표시합니다."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -3563,26 +3586,34 @@ const ResultDetail = ({
             : renderSingleOverview(processedResults[0])}
         </div>
 
-        {/* Choi 알고리즘 결과 (최우선) */}
-        <AnalysisSection
-          title={
-            <span className="inline-flex items-center gap-2">
-              Choi 알고리즘 판정
-              {choiData?.overall && (
-                <AnalysisStatusIndicator status={choiData.overall} />
-              )}
-            </span>
-          }
-          defaultOpen
-          data-testid="section-choi"
-        >
-          <DebugInfo
-            component="renderChoiAlgorithmResult()"
-            hooks={["useState", "useEffect", "useCallback"]}
-            description="Choi 알고리즘 판정 결과를 표시하는 컴포넌트. choi_judgement 데이터를 기반으로 전체 판정, KPI별 상세 판정, 이상 탐지 정보를 표시합니다."
-          />
-          {renderChoiAlgorithmResult()}
-        </AnalysisSection>
+        {/* Choi 알고리즘 결과 (실제 데이터가 있거나 템플릿 모드인 경우에만 표시) */}
+        {((!isTemplateMode && choiAlgorithmResult !== "absent") ||
+          isTemplateMode) && (
+          <AnalysisSection
+            title={
+              <span className="inline-flex items-center gap-2">
+                Choi 알고리즘 판정
+                {isTemplateMode && (
+                  <Badge variant="outline" className="text-blue-600">
+                    템플릿
+                  </Badge>
+                )}
+                {choiData?.overall && (
+                  <AnalysisStatusIndicator status={choiData.overall} />
+                )}
+              </span>
+            }
+            defaultOpen
+            data-testid="section-choi"
+          >
+            <DebugInfo
+              component="renderChoiAlgorithmResult()"
+              hooks={["useState", "useEffect", "useCallback"]}
+              description="Choi 알고리즘 판정 결과를 표시하는 컴포넌트. choi_judgement 데이터를 기반으로 전체 판정, KPI별 상세 판정, 이상 탐지 정보를 표시합니다."
+            />
+            {renderChoiAlgorithmResult()}
+          </AnalysisSection>
+        )}
 
         {/* LLM 분석 리포트 */}
         <AnalysisSection
