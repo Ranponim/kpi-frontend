@@ -1,487 +1,360 @@
-# 📊 KPI Dashboard Frontend
+# 3GPP KPI Dashboard Frontend
 
-> 현대적인 React 기반 KPI 모니터링 대시보드 애플리케이션
->
-> **React 19**, **Vite**, **Tailwind CSS**, **shadcn/ui** 기반의 고성능 웹 애플리케이션
+## 📋 개요
 
-[![React](https://img.shields.io/badge/React-19.1.0-blue.svg)](https://reactjs.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.3.5-646CFF.svg)](https://vitejs.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.1.7-38B2AC.svg)](https://tailwindcss.com/)
-[![Playwright](https://img.shields.io/badge/Playwright-1.54.2-2EAD33.svg)](https://playwright.dev/)
-
-## 🎯 프로젝트 개요
-
-KPI Dashboard는 기업의 핵심 성과 지표(KPI)를 실시간으로 모니터링하고 분석할 수 있는 현대적인 웹 애플리케이션입니다. 통계 분석, LLM 기반 인사이트, 실시간 차트 시각화 등의 기능을 제공합니다.
-
-### ✨ 주요 특징
-
-- **실시간 KPI 모니터링**: 실시간 데이터 업데이트 및 시각화
-- **고급 통계 분석**: Mann-Whitney U Test, Kolmogorov-Smirnov Test 등
-- **LLM 기반 분석**: AI를 활용한 자동화된 인사이트 생성
-- **적응형 UI**: 반응형 디자인과 다크모드 지원
-- **고성능 아키텍처**: 최적화된 번들링과 게으른 로딩
-- **완전한 테스트 커버리지**: E2E 테스트 및 단위 테스트
-
-## 🚀 빠른 시작
-
-### 시스템 요구사항
-
-- **Node.js**: 18.0.0 이상
-- **npm**: 8.0.0 이상 또는 **pnpm**: 8.0.0 이상
-- **브라우저**: Chrome 90+, Firefox 88+, Safari 14+
-
-### 설치 및 실행
-
-```bash
-# 프로젝트 클론
-git clone <repository-url>
-cd kpi_dashboard/frontend
-
-# 의존성 설치 (pnpm 권장)
-pnpm install
-
-# 개발 서버 실행
-pnpm run dev
-
-# 또는 npm 사용 시
-npm install
-npm run dev
-```
-
-애플리케이션이 `http://localhost:5173`에서 실행됩니다.
-
-### 프로덕션 빌드
-
-```bash
-# 프로덕션 빌드
-npm run build
-
-# 미리보기 서버 실행
-npm run preview
-```
-
-## 📁 프로젝트 구조
-
-```
-kpi_dashboard/frontend/
-├── public/                    # 정적 파일들
-├── src/
-│   ├── components/           # React 컴포넌트들
-│   │   ├── ui/              # 재사용 가능한 UI 컴포넌트들
-│   │   ├── common/          # 공통 컴포넌트들
-│   │   ├── Dashboard.jsx    # 메인 대시보드
-│   │   ├── Statistics.jsx   # 통계 분석 페이지
-│   │   ├── ResultsList.jsx  # 분석 결과 목록
-│   │   └── ...
-│   ├── contexts/            # React Context 제공자들
-│   ├── hooks/               # 커스텀 React 훅들
-│   ├── lib/                 # 유틸리티 및 API 클라이언트
-│   ├── utils/               # 헬퍼 함수들
-│   └── types/               # TypeScript 타입 정의
-├── tests/                   # E2E 테스트 파일들
-├── scripts/                 # 빌드 및 배포 스크립트들
-└── docker/                  # Docker 구성 파일들
-```
+3GPP KPI 대시보드 시스템의 프론트엔드 애플리케이션입니다. React (Vite) 기반으로 구축되어 있으며, 백엔드 API와 연동하여 KPI 데이터를 시각화하고 분석 결과를 제공합니다.
 
 ## 🏗️ 아키텍처
 
-### 기술 스택
+### 시스템 구성
 
-#### 프론트엔드 프레임워크
-- **React 19**: 최신 React 기능과 동시성 모드 지원
-- **React Router**: 클라이언트 사이드 라우팅
-- **React Hook Form**: 고성능 폼 관리
+```
+Frontend (React) ↔ Backend (FastAPI) ↔ PostgreSQL (Raw KPI Data)
+                                    ↔ MongoDB (Analysis Results)
+                                    ↔ MCP (LLM Analysis)
+```
 
-#### UI/UX 라이브러리
-- **Tailwind CSS 4**: 유틸리티 우선 CSS 프레임워크
-- **shadcn/ui**: 고품질 UI 컴포넌트 라이브러리
-- **Radix UI**: 접근성 높은 기본 컴포넌트
-- **Lucide React**: 일관된 아이콘 시스템
+### 주요 구성요소
 
-#### 차트 및 데이터 시각화
-- **Recharts**: React 기반 차트 라이브러리
-- **Framer Motion**: 부드러운 애니메이션
+1. **React**: 사용자 인터페이스 프레임워크
+2. **Vite**: 빌드 도구 및 개발 서버
+3. **Chart.js**: 데이터 시각화 라이브러리
+4. **Tailwind CSS**: 스타일링 프레임워크
+5. **Axios**: HTTP 클라이언트
 
-#### 상태 관리 및 데이터
-- **React Context**: 전역 상태 관리
-- **Axios**: HTTP 클라이언트
-- **localStorage**: 클라이언트 사이드 데이터 저장
+## 🔧 구현된 기능
 
-#### 개발 도구
-- **Vite**: 초고속 개발 서버 및 빌드 도구
-- **ESLint**: 코드 품질 관리
-- **Playwright**: E2E 테스트 자동화
-- **Lighthouse CI**: 성능 모니터링
+### 1) 주요 컴포넌트
 
-### 아키텍처 패턴
+#### Dashboard
 
-- **컴포넌트 기반 아키텍처**: 재사용 가능한 컴포넌트 설계
-- **컨테이너/프레젠터 패턴**: 로직과 UI의 분리
-- **커스텀 훅 패턴**: 비즈니스 로직 재사용
-- **Context 패턴**: 전역 상태 관리
-- **Error Boundary 패턴**: 에러 처리 및 복구
+- KPI 데이터 시각화
+- 실시간 차트 업데이트
+- 다중 KPI 동시 표시
 
-## 🎨 주요 기능
+#### Statistics
 
-### 1. 대시보드 (Dashboard)
+- 통계 분석 수행
+- 기간별 데이터 비교
+- PEG 선택 및 필터링
 
-실시간 KPI 모니터링 및 시각화:
-- 실시간 데이터 업데이트
-- 다양한 차트 타입 지원 (막대, 선, 원형, 영역)
-- 반응형 그리드 레이아웃
-- 드래그 앤 드롭 위젯 배치
+#### Analysis Results
 
-### 2. 통계 분석 (Statistics)
+- 분석 결과 조회 및 관리
+- 결과 필터링 및 정렬
+- 상세 분석 결과 표시
 
-고급 통계 분석 기능:
-- **Mann-Whitney U Test**: 두 그룹 간 차이 검정
-- **Kolmogorov-Smirnov Test**: 분포 비교 검정
-- **마할라노비스 거리**: 다차원 이상치 탐지
-- **PEG 비교 분석**: 성능 지표 비교
+#### LLM Analysis
 
-### 3. LLM 분석 (LLM Analysis)
+- LLM 기반 분석 실행
+- 분석 진행 상황 모니터링
+- 결과 시각화
 
-AI 기반 자동 분석:
-- 자연어 기반 분석 요청
-- 자동화된 인사이트 생성
-- 다중 모델 지원
-- 결과 해석 및 시각화
+#### Async Analysis
 
-### 4. 결과 관리 (Results)
+- 비동기 분석 작업 관리
+- 실시간 상태 업데이트
+- 작업 취소 및 결과 조회
 
-분석 결과 관리 및 비교:
-- 분석 결과 목록 조회
-- 상세 결과 비교 기능
-- 결과 필터링 및 검색
-- 결과 내보내기/가져오기
+#### Preference
 
-### 5. 설정 관리 (Preferences)
+- 사용자 설정 관리
+- Import/Export 기능
+- Derived PEG 관리
 
-사용자 맞춤 설정:
-- 테마 설정 (라이트/다크 모드)
-- 차트 설정 및 커스터마이징
-- 알림 설정
-- 데이터 필터링 설정
+### 2) 데이터 구조 (DTO)
+
+#### 새로운 DTO 구조 지원
+
+```javascript
+// DTO 구조 우선 사용
+const result = {
+  status: "success",
+  time_ranges: { ... },
+  peg_metrics: {
+    items: [...],
+    statistics: { ... }
+  },
+  llm_analysis: {
+    summary: "...",
+    issues: [...],
+    recommended_actions: [...]
+  },
+  metadata: { ... },
+  legacy_payload: { ... } // 하위 호환성
+};
+```
+
+#### 레거시 데이터 호환성
+
+```javascript
+// 기존 데이터 구조도 지원
+const legacyResult = {
+  results: [...],
+  analysis: { ... },
+  analysis_raw_compact: { ... }
+};
+```
+
+### 3) API 통합
+
+#### KPI 조회 API
+
+```javascript
+// KPI 데이터 조회
+const kpiData = await apiClient.post("/api/kpi/query", {
+  start_date: "2025-01-01",
+  end_date: "2025-01-02",
+  kpi_types: ["availability", "rrc"],
+  ne: "nvgnb#10000",
+  cellid: "2010",
+});
+```
+
+#### 분석 결과 API
+
+```javascript
+// 분석 결과 조회
+const analysisResults = await apiClient.get("/api/analysis/results");
+
+// LLM 분석 실행
+const llmAnalysis = await apiClient.post("/api/analysis/trigger-llm-analysis", {
+  user_id: "default",
+  n_minus_1: "2024-01-01_00:00~2024-01-01_23:59",
+  n: "2024-01-02_00:00~2024-01-02_23:59",
+  enable_mock: false,
+});
+```
+
+#### 비동기 분석 API
+
+```javascript
+// 비동기 분석 시작
+const asyncAnalysis = await apiClient.post(
+  "/api/async-analysis/start",
+  requestData
+);
+
+// 분석 상태 확인
+const status = await apiClient.get(`/api/async-analysis/status/${analysisId}`);
+
+// 분석 결과 조회
+const result = await apiClient.get(`/api/async-analysis/result/${analysisId}`);
+```
+
+## ⚙️ 설정 및 배포
+
+### 필수 의존성
+
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "axios": "^1.3.0",
+    "chart.js": "^4.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "tailwindcss": "^3.2.0",
+    "lucide-react": "^0.263.0",
+    "sonner": "^1.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^3.1.0",
+    "vite": "^4.1.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0"
+  }
+}
+```
+
+### 환경 변수
+
+```bash
+# API 서버 URL
+VITE_API_BASE_URL=http://localhost:8000
+
+# 개발 모드 설정
+VITE_DEV_MODE=true
+```
+
+### 개발 서버 실행
+
+```bash
+# 의존성 설치
+npm install
+
+# 개발 서버 시작
+npm run dev
+
+# 빌드
+npm run build
+
+# 프리뷰
+npm run preview
+```
 
 ## 🧪 테스트
 
-### E2E 테스트 실행
+### 1) E2E 테스트
+
+#### 핵심 사용자 여정 테스트
+
+- **TC001**: 완전한 워크플로우 (Preference → Statistics → Dashboard)
+- **TC002**: Preference Import/Export 기능
+- **TC003**: LLM 분석 결과 관리 워크플로우
+- **TC004**: Derived PEG 관리 및 활용
+- **TC005**: 실제 데이터 API 연동
+
+#### 테스트 환경 설정
 
 ```bash
-# 모든 E2E 테스트 실행
-npm run test:e2e:all
+# 1. 시스템 시작
+docker compose up -d
 
-# 특정 테스트만 실행
-npm run test:e2e:stable      # 안정성 테스트
-npm run test:e2e:comprehensive  # 종합 테스트
-npm run test:e2e:auxiliary   # 보조 기능 테스트
+# 2. 프론트엔드 시작
+cd frontend && npm run dev
 
-# UI 모드로 테스트 실행
-npm run test:e2e:ui
+# 3. 테스트 데이터 확인
+docker exec -it kpi-mongo mongosh --eval "db.peg_master.find()"
 
-# 테스트 리포트 확인
-npm run test:e2e:report
+# 4. 브라우저에서 테스트 수행
+# http://localhost:5173
 ```
 
-### 성능 테스트
+### 2) 성능 테스트
 
-```bash
-# 성능 기준선 측정
-npm run perf:baseline
+#### 성능 기준
 
-# Lighthouse 성능 분석
-npm run perf:analyze
+- **응답 시간**: API 호출 응답 시간 < 2초
+- **차트 렌더링**: 대시보드 차트 로딩 시간 < 3초
+- **대용량 데이터**: 100개 이상 분석 결과 처리 가능
 
-# 번들 크기 분석
-npm run analyze:bundle
-```
+#### UI/UX 검증
 
-## 🐳 Docker 배포
+- **반응형 디자인**: 다양한 화면 크기에서 정상 동작
+- **에러 처리**: 네트워크 오류 시 적절한 사용자 피드백
+- **로딩 상태**: 비동기 작업 시 로딩 스피너 표시
 
-### 🔧 환경변수 설정
+### 3) 데이터 무결성
 
-Docker 컨테이너에서 백엔드 API URL을 설정하려면 다음 환경변수를 사용하세요:
+#### 검증 항목
 
-```bash
-# 백엔드 API URL 설정
--e BACKEND_BASE_URL="http://165.213.69.30:8000"
--e VITE_API_BASE_URL="http://165.213.69.30:8000/api"
+- **동시성**: 여러 사용자가 동시 접근 시 데이터 충돌 없음
+- **트랜잭션**: 설정 저장 실패 시 부분 업데이트 방지
+- **백업**: 중요 설정 변경 시 이전 상태 복구 가능
 
-# 데이터베이스 설정 (선택사항)
--e DB_HOST="165.213.69.30"
--e DB_PORT="5432"
--e DB_USER="kpi_user"
--e DB_NAME="kpi_db"
--e DB_PASSWORD="your_password"
-```
+## 🔍 데이터 흐름
 
-### Docker 이미지 빌드
-
-```bash
-# 기본 빌드
-docker build -t kpi-dashboard:latest .
-
-# 빌드 시점에 API URL 설정 (권장)
-docker build \
-  --build-arg VITE_API_BASE_URL="http://165.213.69.30:8000/api" \
-  -t kpi-dashboard:latest .
-```
-
-### 컨테이너 실행
-
-```bash
-# 1. 기본 실행 (기본값 사용: http://165.213.69.30:8000)
-docker run -p 8080:80 --name kpi-frontend kpi-dashboard:latest
-
-# 2. 환경변수로 API URL 설정 (권장)
-docker run -p 8080:80 \
-  -e BACKEND_BASE_URL="http://165.213.69.30:8000" \
-  -e VITE_API_BASE_URL="http://165.213.69.30:8000/api" \
-  --name kpi-frontend kpi-dashboard:latest
-
-# 3. 개발 환경용 (localhost)
-docker run -p 8080:80 \
-  -e BACKEND_BASE_URL="http://localhost:8000" \
-  -e VITE_API_BASE_URL="http://localhost:8000/api" \
-  --name kpi-frontend-dev kpi-dashboard:latest
-
-# 4. 다른 서버용
-docker run -p 8080:80 \
-  -e BACKEND_BASE_URL="http://your-server.com:8000" \
-  -e VITE_API_BASE_URL="http://your-server.com:8000/api" \
-  --name kpi-frontend-custom kpi-dashboard:latest
-```
-
-### Docker Compose (권장)
-
-프로젝트 루트에 `docker-compose.yml` 파일을 생성하고 사용하세요:
-
-```yaml
-version: '3.8'
-services:
-  frontend:
-    image: kpi-dashboard-frontend:latest
-    build:
-      context: .
-      args:
-        VITE_API_BASE_URL: http://165.213.69.30:8000/api
-    ports:
-      - "8080:80"
-    environment:
-      - BACKEND_BASE_URL=http://165.213.69.30:8000
-      - VITE_API_BASE_URL=http://165.213.69.30:8000/api
-      - DB_HOST=165.213.69.30
-      - DB_PORT=5432
-      - DB_USER=kpi_user
-      - DB_NAME=kpi_db
-    restart: unless-stopped
-```
-
-실행 명령어:
-```bash
-# 빌드 및 실행
-docker-compose up --build -d
-
-# 로그 확인
-docker-compose logs -f frontend
-
-# 중지
-docker-compose down
-```
-
-### 환경변수 설정 파일
-
-`.env` 파일을 만들어 환경변수를 관리할 수 있습니다:
-
-```bash
-# .env 파일 예제
-BACKEND_BASE_URL=http://165.213.69.30:8000
-VITE_API_BASE_URL=http://165.213.69.30:8000/api
-DB_HOST=165.213.69.30
-DB_PORT=5432
-DB_USER=kpi_user
-DB_NAME=kpi_db
-```
-
-### 확인 방법
-
-컨테이너가 정상적으로 실행되면:
-
-1. **컨테이너 로그 확인**:
-```bash
-docker logs kpi-frontend
-# 또는
-docker-compose logs frontend
-```
-
-2. **브라우저에서 확인**:
-   - `http://localhost:8080` 접속
-   - 브라우저 콘솔에서 `console.log(window.__RUNTIME_CONFIG__)` 실행
-   - API 요청이 올바른 URL로 가는지 Network 탭에서 확인
-
-3. **컨테이너 내부 확인**:
-```bash
-docker exec -it kpi-frontend /bin/sh
-cat /usr/share/nginx/html/runtime-config.js
-```
-
-### 문제 해결
-
-환경변수가 적용되지 않는 경우:
-
-1. **컨테이너 재시작**:
-```bash
-docker restart kpi-frontend
-```
-
-2. **캐시 삭제 후 재빌드**:
-```bash
-docker system prune -f
-docker-compose down
-docker-compose up --build --force-recreate
-```
-
-3. **환경변수 확인**:
-```bash
-docker exec kpi-frontend env | grep -E "(BACKEND|VITE_API|DB_)"
-```
-      - "80:80"
-    environment:
-      - NODE_ENV=production
-    restart: unless-stopped
-```
-
-## 🔧 개발자 가이드
-
-### 코드 품질 관리
-
-```bash
-# 코드 린팅
-npm run lint
-
-# 코드 포맷팅 (Prettier 설정 권장)
-# 개발 환경에서 자동 포맷팅 사용
-```
-
-### 환경 변수 설정
-
-프로젝트 루트에 `.env` 파일 생성:
-
-```env
-# API 설정
-VITE_API_BASE_URL=http://localhost:8000/api
-VITE_API_TIMEOUT=10000
-
-# 애플리케이션 설정
-VITE_APP_TITLE=KPI Dashboard
-VITE_APP_VERSION=1.0.0
-
-# 디버그 설정
-VITE_DEBUG=true
-VITE_LOG_LEVEL=info
-```
-
-### 커밋 컨벤션
-
-```bash
-# 기능 추가
-git commit -m "feat: 새로운 KPI 차트 컴포넌트 추가"
-
-# 버그 수정
-git commit -m "fix: 차트 렌더링 오류 수정"
-
-# 문서 업데이트
-git commit -m "docs: README 설치 가이드 개선"
-
-# 리팩토링
-git commit -m "refactor: 대시보드 컴포넌트 최적화"
-
-# 테스트 추가
-git commit -m "test: E2E 테스트 케이스 추가"
-```
+1. **사용자 입력**: 사용자가 설정 및 요청 입력
+2. **API 호출**: 백엔드 API로 요청 전송
+3. **데이터 처리**: 백엔드에서 데이터 처리 및 분석
+4. **결과 반환**: 처리된 결과를 프론트엔드로 반환
+5. **시각화**: 차트 및 테이블로 데이터 시각화
 
 ## 📊 성능 최적화
 
-### 빌드 최적화 기능
+### 1) 컴포넌트 최적화
 
-- **코드 분할**: 라우트 기반 자동 코드 분할
-- **트리 쉐이킹**: 사용하지 않는 코드 제거
-- **압축**: Gzip/Brotli 압축 지원
-- **캐싱**: 긴 캐시 헤더를 통한 정적 자원 캐싱
+- React.memo를 사용한 불필요한 리렌더링 방지
+- useMemo, useCallback을 사용한 계산 최적화
+- 가상화를 사용한 대용량 데이터 처리
 
-### 런타임 최적화
+### 2) API 최적화
 
-- **React.lazy**: 컴포넌트 지연 로딩
-- **React.memo**: 불필요한 리렌더링 방지
-- **useMemo/useCallback**: 계산 비용 최적화
-- **가상화**: 대용량 데이터 렌더링 최적화
+- 요청 캐싱 및 중복 요청 방지
+- 배치 요청을 통한 네트워크 효율성 향상
+- 에러 처리 및 재시도 로직
 
-## 🤝 기여하기
+### 3) 번들 최적화
 
-### 개발 환경 설정
+- 코드 스플리팅을 통한 초기 로딩 시간 단축
+- 트리 셰이킹을 통한 번들 크기 최적화
+- 이미지 및 정적 자산 최적화
 
-1. **프로젝트 클론**
-   ```bash
-   git clone <repository-url>
-   cd kpi_dashboard/frontend
-   ```
+## ⚠️ 현재 제한사항
 
-2. **개발 의존성 설치**
-   ```bash
-   pnpm install
-   ```
+- 실시간 업데이트는 폴링 기반 (추후 WebSocket 지원 예정)
+- 대용량 데이터 처리 시 성능 최적화 필요
+- 모바일 환경에서의 사용성 개선 필요
 
-3. **개발 서버 실행**
-   ```bash
-   pnpm run dev
-   ```
+## 🔄 향후 개선
 
-4. **브라우저에서 확인**
-   - `http://localhost:5173` 접속
-   - 핫 리로드가 자동으로 적용됩니다
+- WebSocket을 통한 실시간 업데이트
+- PWA 지원으로 오프라인 기능 추가
+- 모바일 최적화 및 반응형 디자인 개선
+- 접근성(Accessibility) 향상
+- 다국어 지원
 
-### 코드 기여 절차
+## 🛠️ 개발 가이드
 
-1. **이슈 생성**: 새로운 기능이나 버그에 대한 이슈 생성
-2. **브랜치 생성**: 기능 브랜치 생성 (`git checkout -b feature/new-feature`)
-3. **코드 작성**: 기능 구현 및 테스트 작성
-4. **테스트 실행**: 모든 테스트가 통과하는지 확인
-5. **Pull Request**: 변경사항에 대한 PR 생성
-6. **코드 리뷰**: 팀원들의 리뷰 후 머지
+### 1) 컴포넌트 개발
 
-### 코드 스타일 가이드
+```javascript
+// 새로운 컴포넌트 생성 시
+import React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-- **ESLint 규칙 준수**: 모든 ESLint 경고/에러 해결
-- **의미 있는 변수명**: `x`, `temp` 대신 `userName`, `calculateAverage` 사용
-- **함수 단위 책임**: 하나의 함수는 하나의 기능만 담당
-- **주석 작성**: 복잡한 로직에 대한 상세한 주석 필수
-- **에러 처리**: 모든 비동기 작업에 적절한 에러 처리
+const NewComponent = () => {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>새 컴포넌트</CardTitle>
+      </CardHeader>
+      <CardContent>{/* 컴포넌트 내용 */}</CardContent>
+    </Card>
+  );
+};
 
-## 📝 라이선스
+export default NewComponent;
+```
 
-이 프로젝트는 [MIT 라이선스](LICENSE)를 따릅니다.
+### 2) API 통합
 
-## 🙋‍♂️ 지원 및 문의
+```javascript
+// API 클라이언트 사용
+import { apiClient } from "@/lib/apiClient";
 
-- **이슈 트래커**: [GitHub Issues](https://github.com/your-org/kpi-dashboard/issues)
-- **토론**: [GitHub Discussions](https://github.com/your-org/kpi-dashboard/discussions)
-- **문서**: [Wiki](https://github.com/your-org/kpi-dashboard/wiki)
+const fetchData = async () => {
+  try {
+    const response = await apiClient.get("/api/endpoint");
+    return response.data;
+  } catch (error) {
+    console.error("API 호출 실패:", error);
+    throw error;
+  }
+};
+```
 
-## 🏆 릴리즈 노트
+### 3) 상태 관리
 
-### v1.0.0 (2024-01-XX)
-- ✅ React 19 마이그레이션 완료
-- ✅ 새로운 통계 분석 모듈 추가
-- ✅ LLM 기반 분석 기능 구현
-- ✅ 완전한 E2E 테스트 커버리지
-- ✅ Docker 컨테이너화 지원
-- ✅ 성능 최적화 및 번들 크기 감소
+```javascript
+// React Hook을 사용한 상태 관리
+import { useState, useEffect } from "react";
 
----
+const useData = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-**개발자**: AI Assistant & Team
-**마지막 업데이트**: 2024-01-XX
-**문서 버전**: 1.0.0
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const result = await apiClient.get("/api/data");
+        setData(result.data);
+      } catch (err) {
+        setError(err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
+    fetchData();
+  }, []);
 
+  return { data, loading, error };
+};
+```
 
+_문서 업데이트: 2025-01-14 (DTO 구조 및 비동기 처리 반영)_

@@ -175,13 +175,111 @@ const ResultDetail = ({
   const isSingleMode = mode === "single" && resultIds.length === 1;
   const isTemplateMode = mode === "template";
 
-  // === results 배열 안전성 검증 ===
+  // === results 배열 안전성 검증 및 DTO 구조 정규화 ===
   const safeResults = useMemo(() => {
     if (!Array.isArray(results)) {
       console.warn("⚠️ results가 배열이 아닙니다:", results);
       return [];
     }
-    return results;
+
+    return results.map((item) => {
+      if (!item) return item;
+
+      // DTO 구조 우선, 레거시 fallback
+      const pegMetrics = item.peg_metrics || {};
+      const dtoItems = Array.isArray(pegMetrics.items) ? pegMetrics.items : [];
+      const dtoStats = pegMetrics.statistics || {};
+
+      // 레거시 fallback
+      const legacyAnalysis =
+        item.legacy_payload?.analysis || item.analysis || item.data || {};
+
+      // DTO 결과가 없다면 레거시 결과를 DTO 형태로 변환
+      let normalizedItems = dtoItems;
+      if (normalizedItems.length === 0 && Array.isArray(item.results)) {
+        normalizedItems = item.results.map((legacy) => ({
+          peg_name: legacy.peg_name,
+          n_minus_1_value: legacy.n_minus_1_avg ?? legacy.nMinus1Avg,
+          n_value: legacy.n_avg ?? legacy.nAvg,
+          absolute_change:
+            legacy.absolute_change ??
+            legacy.difference ??
+            legacy.change ??
+            null,
+          percentage_change:
+            legacy.percentage_change ??
+            legacy.change_pct ??
+            legacy.changePercent ??
+            null,
+          llm_analysis_summary:
+            legacy.summary ?? legacy.llm_analysis_summary ?? null,
+        }));
+      }
+
+      // 레거시 통계 -> DTO 변환
+      let normalizedStats = dtoStats;
+      if (
+        Object.keys(normalizedStats).length === 0 &&
+        Array.isArray(item.stats)
+      ) {
+        normalizedStats = {
+          total_pegs: item.stats.length,
+          complete_data_pegs: item.stats.filter((s) => s.complete).length,
+          incomplete_data_pegs: item.stats.filter((s) => !s.complete).length,
+          positive_changes: item.stats.filter((s) => s.change_pct > 0).length,
+          negative_changes: item.stats.filter((s) => s.change_pct < 0).length,
+          no_change: item.stats.filter((s) => s.change_pct === 0).length,
+          avg_percentage_change:
+            item.stats.reduce((acc, cur) => acc + (cur.change_pct ?? 0), 0) /
+              (item.stats.length || 1) || null,
+        };
+      }
+
+      const normalizedLlm = item.llm_analysis || {
+        summary:
+          legacyAnalysis.executive_summary ??
+          legacyAnalysis.overall_summary ??
+          legacyAnalysis.comprehensive_summary ??
+          legacyAnalysis.summary ??
+          null,
+        issues:
+          legacyAnalysis.diagnostic_findings ?? legacyAnalysis.findings ?? [],
+        recommended_actions:
+          legacyAnalysis.recommended_actions ??
+          legacyAnalysis.recommendations ??
+          [],
+        peg_insights: legacyAnalysis.peg_insights ?? {},
+        confidence: legacyAnalysis.confidence ?? null,
+        model: legacyAnalysis.model ?? null,
+      };
+
+      const normalizedMetadata = {
+        ...item.metadata,
+        total_pegs:
+          dtoStats.total_pegs ??
+          item.metadata?.total_pegs ??
+          normalizedItems.length,
+        complete_data_pegs:
+          dtoStats.complete_data_pegs ??
+          item.metadata?.complete_data_pegs ??
+          null,
+      };
+
+      return {
+        ...item,
+        peg_metrics: {
+          items: normalizedItems,
+          statistics: normalizedStats,
+        },
+        llm_analysis: normalizedLlm,
+        metadata: normalizedMetadata,
+        legacy_payload: item.legacy_payload || {
+          results: item.results,
+          stats: item.stats,
+          analysis: legacyAnalysis,
+        },
+      };
+    });
   }, [results]);
 
   // === 템플릿 모드 디버깅 정보 ===
@@ -920,7 +1018,7 @@ const ResultDetail = ({
     }
   }, []);
 
-  // === PEG 비교분석 결과 파싱 함수 (MCP에서 받은 데이터 처리) ===
+  // === PEG 비교분석 결과 파싱 함수 (DTO 구조 기반) ===
   const parsePEGComparisonResponse = useCallback((apiResponse) => {
     try {
       console.log("📊 PEG 비교분석 응답 파싱 시작", apiResponse);
@@ -933,33 +1031,81 @@ const ResultDetail = ({
 
       const { data } = apiResponse;
 
-      // MCP에서 받은 데이터를 프론트엔드 형식으로 변환
-      const pegResults = data.peg_comparison_results.map((peg) => ({
-        peg_name: peg.peg_name,
-        weight: peg.weight,
-        n1_avg: peg.n1_period.avg,
-        n_avg: peg.n_period.avg,
-        n1_rsd: peg.n1_period.rsd,
-        n_rsd: peg.n_period.rsd,
-        change_percent: peg.comparison.change_percent,
-        trend: peg.comparison.trend,
-        significance: peg.comparison.significance,
-        // 추가 메타데이터
-        n1_values: peg.n1_period.values,
-        n_values: peg.n_period.values,
-        confidence: peg.comparison.confidence,
-        cell_id: peg.metadata.cell_id,
-        calculated_at: peg.metadata.calculated_at,
-        data_quality: peg.metadata.data_quality,
-      }));
+      // DTO 구조 우선 처리
+      if (data.peg_metrics && Array.isArray(data.peg_metrics.items)) {
+        const dtoResults = data.peg_metrics.items.map((item) => ({
+          peg_name: item.peg_name,
+          weight: 5, // 기본 가중치 (DTO에서 가중치 정보가 별도로 관리되는 경우)
+          n1_avg: item.n_minus_1_value,
+          n_avg: item.n_value,
+          n1_rsd: 0, // DTO에서 RSD 정보가 없는 경우 기본값
+          n_rsd: 0,
+          change_percent: item.percentage_change || 0,
+          trend:
+            item.percentage_change > 0
+              ? "up"
+              : item.percentage_change < 0
+              ? "down"
+              : "stable",
+          significance:
+            Math.abs(item.percentage_change || 0) > 5 ? "high" : "medium",
+          // 추가 메타데이터
+          n1_values: [],
+          n_values: [],
+          confidence: 0.8,
+          cell_id: data.metadata?.cell_id || "unknown",
+          calculated_at:
+            data.metadata?.processing_timestamp || new Date().toISOString(),
+          data_quality: "good",
+          llm_analysis_summary: item.llm_analysis_summary,
+        }));
 
-      // 가중치 기준으로 정렬
-      const sortedResults = pegResults.sort(
-        (a, b) => (b.weight || 0) - (a.weight || 0)
-      );
+        // 가중치 기준으로 정렬
+        const sortedResults = dtoResults.sort(
+          (a, b) => (b.weight || 0) - (a.weight || 0)
+        );
 
-      console.log("✅ PEG 비교분석 응답 파싱 완료", sortedResults);
-      return sortedResults;
+        console.log("✅ PEG 비교분석 응답 파싱 완료 (DTO 구조)", sortedResults);
+        return sortedResults;
+      }
+
+      // 레거시 구조 fallback
+      if (
+        data.peg_comparison_results &&
+        Array.isArray(data.peg_comparison_results)
+      ) {
+        const pegResults = data.peg_comparison_results.map((peg) => ({
+          peg_name: peg.peg_name,
+          weight: peg.weight,
+          n1_avg: peg.n1_period.avg,
+          n_avg: peg.n_period.avg,
+          n1_rsd: peg.n1_period.rsd,
+          n_rsd: peg.n_period.rsd,
+          change_percent: peg.comparison.change_percent,
+          trend: peg.comparison.trend,
+          significance: peg.comparison.significance,
+          // 추가 메타데이터
+          n1_values: peg.n1_period.values,
+          n_values: peg.n_period.values,
+          confidence: peg.comparison.confidence,
+          cell_id: peg.metadata.cell_id,
+          calculated_at: peg.metadata.calculated_at,
+          data_quality: peg.metadata.data_quality,
+        }));
+
+        // 가중치 기준으로 정렬
+        const sortedResults = pegResults.sort(
+          (a, b) => (b.weight || 0) - (a.weight || 0)
+        );
+
+        console.log(
+          "✅ PEG 비교분석 응답 파싱 완료 (레거시 구조)",
+          sortedResults
+        );
+        return sortedResults;
+      }
+
+      throw new Error("지원하지 않는 데이터 구조입니다");
     } catch (error) {
       console.error("❌ PEG 비교분석 응답 파싱 실패", error);
       return null;
@@ -1244,11 +1390,35 @@ const ResultDetail = ({
         setChoiAlgorithmResult("absent");
       }
 
-      // 마할라노비스 거리 계산
-      if (firstResult?.kpiResults || firstResult?.stats) {
-        const mahalanobisData = firstResult.kpiResults || firstResult.stats;
-        console.log("🧮 마할라노비스 계산용 데이터:", mahalanobisData);
+      // 마할라노비스 거리 계산 (DTO 구조 기반)
+      let mahalanobisData = null;
 
+      // DTO 구조 우선 처리
+      if (
+        firstResult?.peg_metrics?.items &&
+        Array.isArray(firstResult.peg_metrics.items)
+      ) {
+        mahalanobisData = firstResult.peg_metrics.items.map((item) => ({
+          name: item.peg_name,
+          value: item.n_value || 0,
+          n_minus_1_value: item.n_minus_1_value || 0,
+          change: item.absolute_change || 0,
+          change_percent: item.percentage_change || 0,
+        }));
+        console.log(
+          "🧮 마할라노비스 계산용 데이터 (DTO 구조):",
+          mahalanobisData
+        );
+      } else if (firstResult?.kpiResults || firstResult?.stats) {
+        // 레거시 구조 fallback
+        mahalanobisData = firstResult.kpiResults || firstResult.stats;
+        console.log(
+          "🧮 마할라노비스 계산용 데이터 (레거시 구조):",
+          mahalanobisData
+        );
+      }
+
+      if (mahalanobisData) {
         try {
           const mahalanobisResult =
             calculateMahalanobisDistance(mahalanobisData);
@@ -1262,6 +1432,7 @@ const ResultDetail = ({
         }
       } else {
         console.warn("⚠️ 마할라노비스 계산을 위한 데이터가 없습니다:", {
+          peg_metrics: firstResult?.peg_metrics,
           kpiResults: firstResult?.kpiResults,
           stats: firstResult?.stats,
         });
@@ -1346,13 +1517,9 @@ const ResultDetail = ({
     });
   }, [processedResults, isCompareMode]);
 
-  // === 단일 결과 차트 데이터 처리 ===
+  // === 단일 결과 차트 데이터 처리 (DTO 구조 기반) ===
   const kpiChartData = useMemo(() => {
-    if (
-      isCompareMode ||
-      !processedResults.length ||
-      !processedResults[0].stats
-    ) {
+    if (isCompareMode || !processedResults.length) {
       return {
         kpiResults: [],
         sortedKpiResults: [],
@@ -1373,31 +1540,53 @@ const ResultDetail = ({
     }
 
     const result = processedResults[0];
-    const statsData = result.stats || [];
 
-    const pegComparison = {};
-    statsData.forEach((stat) => {
-      const pegName = stat.kpi_name;
-      if (!pegComparison[pegName]) {
-        pegComparison[pegName] = { peg_name: pegName, weight: 5 };
-      }
-      if (stat.period === "N-1") {
-        pegComparison[pegName]["N-1"] = stat.avg;
-      } else if (stat.period === "N") {
-        pegComparison[pegName]["N"] = stat.avg;
-      }
-    });
+    // DTO 구조 우선 처리
+    let kpiResults = [];
 
-    const weightData = result.request_params?.peg_definitions || {};
-    Object.keys(pegComparison).forEach((pegName) => {
-      if (weightData[pegName]?.weight) {
-        pegComparison[pegName].weight = weightData[pegName].weight;
-      }
-    });
+    if (result.peg_metrics && Array.isArray(result.peg_metrics.items)) {
+      // DTO 구조에서 직접 변환
+      kpiResults = result.peg_metrics.items.map((item) => ({
+        peg_name: item.peg_name,
+        weight: 5, // 기본 가중치
+        "N-1": item.n_minus_1_value || 0,
+        N: item.n_value || 0,
+        change: item.absolute_change || 0,
+        change_percent: item.percentage_change || 0,
+        trend:
+          item.percentage_change > 0
+            ? "up"
+            : item.percentage_change < 0
+            ? "down"
+            : "stable",
+        llm_analysis_summary: item.llm_analysis_summary,
+      }));
+    } else if (result.stats && Array.isArray(result.stats)) {
+      // 레거시 구조 fallback
+      const pegComparison = {};
+      result.stats.forEach((stat) => {
+        const pegName = stat.kpi_name;
+        if (!pegComparison[pegName]) {
+          pegComparison[pegName] = { peg_name: pegName, weight: 5 };
+        }
+        if (stat.period === "N-1") {
+          pegComparison[pegName]["N-1"] = stat.avg;
+        } else if (stat.period === "N") {
+          pegComparison[pegName]["N"] = stat.avg;
+        }
+      });
 
-    const kpiResults = Object.values(pegComparison).filter(
-      (peg) => peg["N-1"] !== undefined && peg["N"] !== undefined
-    );
+      const weightData = result.request_params?.peg_definitions || {};
+      Object.keys(pegComparison).forEach((pegName) => {
+        if (weightData[pegName]?.weight) {
+          pegComparison[pegName].weight = weightData[pegName].weight;
+        }
+      });
+
+      kpiResults = Object.values(pegComparison).filter(
+        (peg) => peg["N-1"] !== undefined && peg["N"] !== undefined
+      );
+    }
     // 정렬 로직: Preference 기반
     const sortKey = pegSort;
     const sortedKpiResults = [...kpiResults].sort((a, b) => {
@@ -1868,24 +2057,41 @@ const ResultDetail = ({
     return analysis;
   };
 
-  // 우선순위 기반 분석 데이터 추출 (개선된 다중 폴백)
+  // DTO 우선 분석 데이터 추출 (새로운 구조 기반)
   const extractAnalysisData = (data) => {
     let doc, analysis, dataStructure;
 
-    // 우선순위 1: Backend 표준 구조 (data.analysis) - LLM 결과가 analysis 필드에 저장됨
-    if (
+    // 우선순위 1: DTO 구조 (llm_analysis) - 새로운 표준 구조
+    if (data?.llm_analysis && typeof data.llm_analysis === "object") {
+      doc = data;
+      analysis = data.llm_analysis;
+      dataStructure = "llm_analysis (DTO 구조 - 새로운 표준)";
+      console.log("✅ 우선순위 1: llm_analysis DTO 구조 사용 (새로운 표준)");
+    }
+    // 우선순위 2: 레거시 페이로드 (legacy_payload.analysis) - 호환성 유지
+    else if (
+      data?.legacy_payload?.analysis &&
+      typeof data.legacy_payload.analysis === "object"
+    ) {
+      doc = data;
+      analysis = data.legacy_payload.analysis;
+      dataStructure = "legacy_payload.analysis (레거시 호환성)";
+      console.log(
+        "⚠️ 우선순위 2: legacy_payload.analysis 구조 사용 (레거시 호환성)"
+      );
+    }
+    // 우선순위 3: Backend 표준 구조 (data.analysis) - 기존 백엔드 구조
+    else if (
       data?.data?.analysis &&
       typeof data.data.analysis === "object" &&
       !Array.isArray(data.data.analysis)
     ) {
       doc = data.data;
       analysis = doc.analysis;
-      dataStructure = "data.analysis (Backend 표준 구조 - LLM 결과 위치)";
-      console.log(
-        "✅ 우선순위 1: data.analysis 구조 사용 (Backend 표준 - LLM 결과 위치)"
-      );
+      dataStructure = "data.analysis (Backend 표준 구조)";
+      console.log("⚠️ 우선순위 3: data.analysis 구조 사용 (Backend 표준)");
     }
-    // 우선순위 2: Backend 표준 구조 (data) - data 필드가 직접 LLM 결과인 경우
+    // 우선순위 4: Backend 표준 구조 (data) - data 필드가 직접 LLM 결과인 경우
     else if (
       data?.data &&
       typeof data.data === "object" &&
@@ -1903,7 +2109,7 @@ const ResultDetail = ({
         analysis = doc.data;
         dataStructure = "data (Backend 표준 구조 - LLM 결과 직접 위치)";
         console.log(
-          "✅ 우선순위 2: data 구조 사용 (Backend 표준 - LLM 결과 직접 위치)"
+          "⚠️ 우선순위 4: data 구조 사용 (Backend 표준 - LLM 결과 직접 위치)"
         );
       } else {
         // LLM 필드가 없으면 다음 우선순위로
@@ -1913,21 +2119,23 @@ const ResultDetail = ({
         console.log("⚠️ data 구조에 LLM 필드가 없습니다");
       }
     }
-    // 우선순위 3: 기존 중첩 구조 (first.data.data.analysis) - 호환성 유지
+    // 우선순위 5: 기존 중첩 구조 (data.data.data.analysis) - 호환성 유지
     else if (data?.data?.data?.analysis) {
       doc = data.data.data;
       analysis = doc.analysis;
-      dataStructure = "data.data.analysis (기존 중첩 구조)";
-      console.log("⚠️ 우선순위 3: data.data.analysis 구조 사용 (중첩 구조)");
+      dataStructure = "data.data.data.analysis (기존 중첩 구조)";
+      console.log(
+        "⚠️ 우선순위 5: data.data.data.analysis 구조 사용 (중첩 구조)"
+      );
     }
-    // 우선순위 4: 직접 구조 (first.analysis) - 폴백
+    // 우선순위 6: 직접 구조 (analysis) - 폴백
     else if (data?.analysis) {
       doc = data;
       analysis = doc.analysis;
       dataStructure = "analysis (직접 구조)";
-      console.log("📋 우선순위 4: analysis 직접 구조 사용");
+      console.log("📋 우선순위 6: analysis 직접 구조 사용");
     }
-    // 우선순위 5: 기본값
+    // 우선순위 7: 기본값
     else {
       doc = data || {};
       analysis = {};
@@ -2153,9 +2361,19 @@ const ResultDetail = ({
       isValid: !!summaryText && summaryText !== "요약 정보가 없습니다.",
     });
 
-    // 진단 결과: 다중 필드 지원으로 유연한 탐색
+    // DTO 구조 기반 진단 결과 추출
     const extractDiagnosticFindings = (analysis) => {
-      // 우선순위: diagnostic_findings -> key_findings -> findings -> observations
+      // DTO 구조 우선: issues 필드
+      if (Array.isArray(analysis.issues) && analysis.issues.length > 0) {
+        return analysis.issues.map((issue) => {
+          if (typeof issue === "string") {
+            return { primary_hypothesis: issue };
+          }
+          return issue;
+        });
+      }
+
+      // 레거시 필드들 fallback
       const possibleFields = [
         "diagnostic_findings",
         "key_findings",
@@ -2182,15 +2400,23 @@ const ResultDetail = ({
 
     const diagnosticFindings = extractDiagnosticFindings(analysis);
 
-    // 권장 조치: 다중 필드 지원으로 유연한 탐색
+    // DTO 구조 기반 권장 조치 추출
     const extractRecommendedActions = (analysis) => {
-      // 우선순위: recommended_actions -> recommendations -> actions -> suggestions
-      const possibleFields = [
-        "recommended_actions",
-        "recommendations",
-        "actions",
-        "suggestions",
-      ];
+      // DTO 구조 우선: recommended_actions 필드
+      if (
+        Array.isArray(analysis.recommended_actions) &&
+        analysis.recommended_actions.length > 0
+      ) {
+        return analysis.recommended_actions.map((action) => {
+          if (typeof action === "string") {
+            return { priority: "", action: action, details: "" };
+          }
+          return action;
+        });
+      }
+
+      // 레거시 필드들 fallback
+      const possibleFields = ["recommendations", "actions", "suggestions"];
 
       for (const field of possibleFields) {
         const value = analysis[field];
@@ -3201,7 +3427,7 @@ const ResultDetail = ({
     );
   };
 
-  // === PEG 비교 결과 렌더링 ===
+  // === PEG 비교 결과 렌더링 (DTO 구조 기반) ===
   const renderPegComparisonResult = () => {
     if (!pegComparisonResult) {
       return (
@@ -3223,6 +3449,49 @@ const ResultDetail = ({
       );
     }
 
+    // DTO 구조에서 PEG 데이터 추출 및 변환
+    const processedPegData = pegComparisonResult
+      .map((peg) => {
+        // DTO 구조인지 확인
+        if (
+          peg.peg_name &&
+          peg.n1_avg !== undefined &&
+          peg.n_avg !== undefined
+        ) {
+          // 이미 변환된 데이터
+          return peg;
+        } else if (peg.peg_metrics && Array.isArray(peg.peg_metrics.items)) {
+          // DTO 구조에서 변환
+          return peg.peg_metrics.items.map((item) => ({
+            peg_name: item.peg_name,
+            weight: 5, // 기본 가중치
+            n1_avg: item.n_minus_1_value || 0,
+            n_avg: item.n_value || 0,
+            n1_rsd: 0, // DTO에서 RSD 정보가 없는 경우 기본값
+            n_rsd: 0,
+            change_percent: item.percentage_change || 0,
+            trend:
+              item.percentage_change > 0
+                ? "up"
+                : item.percentage_change < 0
+                ? "down"
+                : "stable",
+            significance:
+              Math.abs(item.percentage_change || 0) > 5 ? "high" : "medium",
+            confidence: 0.8,
+            cell_id: peg.metadata?.cell_id || "unknown",
+            calculated_at:
+              peg.metadata?.processing_timestamp || new Date().toISOString(),
+            data_quality: "good",
+            llm_analysis_summary: item.llm_analysis_summary,
+          }));
+        } else {
+          // 레거시 구조 fallback
+          return peg;
+        }
+      })
+      .flat();
+
     return (
       <Card className="border-l-4 border-l-green-500">
         <CardHeader>
@@ -3235,7 +3504,7 @@ const ResultDetail = ({
             </div>
             <div className="flex items-center gap-2">
               {(() => {
-                const visibleNames = (pegComparisonResult || [])
+                const visibleNames = (processedPegData || [])
                   .filter((p) => {
                     const matchesName =
                       !pegFilter ||
@@ -3259,7 +3528,7 @@ const ResultDetail = ({
                   })
                   .map((p) => p.peg_name);
 
-                const total = pegComparisonResult?.length || 0;
+                const total = processedPegData?.length || 0;
                 const selCount = preferredPegs.length;
 
                 return (
@@ -3309,7 +3578,7 @@ const ResultDetail = ({
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
               <div className="text-lg font-bold text-blue-600 dark:text-blue-300">
-                {pegComparisonResult.length}
+                {processedPegData.length}
               </div>
               <div className="text-xs text-muted-foreground dark:text-muted-foreground/80">
                 총 PEG 수
@@ -3317,19 +3586,19 @@ const ResultDetail = ({
             </div>
             <div className="text-center p-3 bg-green-50 dark:bg-green-950/40 rounded-lg">
               <div className="text-lg font-bold text-green-600 dark:text-green-300">
-                {pegComparisonResult.filter((p) => p.trend === "up").length}
+                {processedPegData.filter((p) => p.trend === "up").length}
               </div>
               <div className="text-xs text-muted-foreground">개선 PEG</div>
             </div>
             <div className="text-center p-3 bg-red-50 dark:bg-red-950/40 rounded-lg">
               <div className="text-lg font-bold text-red-600 dark:text-red-300">
-                {pegComparisonResult.filter((p) => p.trend === "down").length}
+                {processedPegData.filter((p) => p.trend === "down").length}
               </div>
               <div className="text-xs text-muted-foreground">하락 PEG</div>
             </div>
             <div className="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
               <div className="text-lg font-bold text-gray-600 dark:text-gray-300">
-                {pegComparisonResult.filter((p) => p.trend === "stable").length}
+                {processedPegData.filter((p) => p.trend === "stable").length}
               </div>
               <div className="text-xs text-muted-foreground">안정 PEG</div>
             </div>
@@ -3360,10 +3629,10 @@ const ResultDetail = ({
                   <tbody>
                     {(Array.isArray(dashboardSettings?.selectedPegs) &&
                     dashboardSettings.selectedPegs.length > 0
-                      ? pegComparisonResult.filter((p) =>
+                      ? processedPegData.filter((p) =>
                           dashboardSettings.selectedPegs.includes(p.peg_name)
                         )
-                      : pegComparisonResult
+                      : processedPegData
                     ).map((peg, idx) => (
                       <tr key={idx} className="border-t hover:bg-muted/30">
                         <td className="p-3 font-medium">{peg.peg_name}</td>

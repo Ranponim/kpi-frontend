@@ -282,6 +282,141 @@ export const runChoiAnalysis = async (payload) => {
   }
 };
 
+// === 비동기 분석 API 함수들 ===
+
+/**
+ * 비동기 LLM 분석을 시작합니다
+ * @param {Object} requestParams - 분석 요청 파라미터
+ * @returns {Promise<Object>} 분석 시작 응답 (analysis_id 포함)
+ */
+export const startAsyncAnalysis = async (requestParams) => {
+  logApiClient("info", "비동기 LLM 분석 시작", {
+    hasDbConfig: !!requestParams?.db_config,
+    hasTimeRanges: !!(requestParams?.n_minus_1 && requestParams?.n),
+    neId: requestParams?.ne_id,
+    cellId: requestParams?.cell_id,
+  });
+
+  try {
+    const response = await apiClient.post(
+      "/api/async-analysis/start",
+      requestParams
+    );
+    logApiClient("info", "비동기 LLM 분석 시작 성공", {
+      analysisId: response.data?.analysis_id,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "비동기 LLM 분석 시작 실패", error);
+    throw error;
+  }
+};
+
+/**
+ * 비동기 분석 상태를 조회합니다
+ * @param {string} analysisId - 분석 ID
+ * @returns {Promise<Object>} 분석 상태 정보
+ */
+export const getAsyncAnalysisStatus = async (analysisId) => {
+  logApiClient("info", "비동기 분석 상태 조회", { analysisId });
+
+  try {
+    const response = await apiClient.get(
+      `/api/async-analysis/status/${analysisId}`
+    );
+    logApiClient("info", "비동기 분석 상태 조회 성공", {
+      status: response.data?.status,
+      progress: response.data?.progress,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "비동기 분석 상태 조회 실패", error);
+    throw error;
+  }
+};
+
+/**
+ * 비동기 분석 결과를 조회합니다
+ * @param {string} analysisId - 분석 ID
+ * @returns {Promise<Object>} 분석 결과
+ */
+export const getAsyncAnalysisResult = async (analysisId) => {
+  logApiClient("info", "비동기 분석 결과 조회", { analysisId });
+
+  try {
+    const response = await apiClient.get(
+      `/api/async-analysis/result/${analysisId}`
+    );
+    logApiClient("info", "비동기 분석 결과 조회 성공", {
+      hasResult: !!response.data?.result,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "비동기 분석 결과 조회 실패", error);
+    throw error;
+  }
+};
+
+/**
+ * 비동기 분석을 취소합니다
+ * @param {string} analysisId - 분석 ID
+ * @returns {Promise<Object>} 취소 결과
+ */
+export const cancelAsyncAnalysis = async (analysisId) => {
+  logApiClient("info", "비동기 분석 취소", { analysisId });
+
+  try {
+    const response = await apiClient.post(
+      `/api/async-analysis/cancel/${analysisId}`
+    );
+    logApiClient("info", "비동기 분석 취소 성공");
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "비동기 분석 취소 실패", error);
+    throw error;
+  }
+};
+
+/**
+ * 실행 중인 비동기 분석 작업 목록을 조회합니다
+ * @returns {Promise<Object>} 실행 중인 작업 목록
+ */
+export const getAsyncAnalysisList = async () => {
+  logApiClient("info", "비동기 분석 작업 목록 조회");
+
+  try {
+    const response = await apiClient.get("/api/async-analysis/list");
+    logApiClient("info", "비동기 분석 작업 목록 조회 성공", {
+      totalCount: response.data?.total_count,
+      runningCount: response.data?.running_count,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "비동기 분석 작업 목록 조회 실패", error);
+    throw error;
+  }
+};
+
+/**
+ * 비동기 분석 서비스 상태를 확인합니다
+ * @returns {Promise<Object>} 서비스 상태 정보
+ */
+export const getAsyncAnalysisHealth = async () => {
+  logApiClient("info", "비동기 분석 서비스 상태 확인");
+
+  try {
+    const response = await apiClient.get("/api/async-analysis/health");
+    logApiClient("info", "비동기 분석 서비스 상태 확인 성공", {
+      status: response.data?.status,
+      runningTasks: response.data?.running_tasks,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "비동기 분석 서비스 상태 확인 실패", error);
+    throw error;
+  }
+};
+
 /**
  * 분석 결과 목록에서 LLM 분석 결과도 포함하여 조회합니다
  * 기존 getAnalysisResults에 type 필터 추가
