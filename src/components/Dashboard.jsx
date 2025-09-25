@@ -120,7 +120,7 @@ const Dashboard = () => {
           )
       );
 
-      const response = await apiClient.post("/api/kpi/timeseries", {
+      const response = await apiClient.post("/kpi/timeseries", {
         kpi_types: basicPegs,
         ne: selectedNEs,
         cellid: selectedCellIds,

@@ -286,3 +286,5 @@ docker exec -it kpi-mongo mongosh --eval "db.peg_master.find()"
 - 중대한 UI/UX 이슈 0건
 - API 응답 시간 목표 달성
 - 실제 사용자 시나리오에서 끊김 없는 경험 제공
+
+

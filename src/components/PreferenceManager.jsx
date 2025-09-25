@@ -73,7 +73,7 @@ const PreferenceManager = () => {
       // DB에서 PEG 목록 조회 (백엔드 스키마에 맞춰 평탄화하여 전달)
       // 설정된 pegLimit 값 사용 (기본값: 10000)
       const pegLimit = settings?.dashboardSettings?.pegLimit || 10000;
-      const response = await apiClient.post("/api/master/pegs", {
+      const response = await apiClient.post("/master/pegs", {
         host: String(dbConfig.host).trim(),
         port: Number(dbConfig.port) || 5432,
         user: String(dbConfig.user || "").trim(),
@@ -197,7 +197,7 @@ const PreferenceManager = () => {
           dbname: String(db.dbname || "").trim(),
           table: String(db.table || "summary").trim(),
         };
-        const res = await apiClient.post("/api/master/hosts", payload);
+        const res = await apiClient.post("/master/hosts", payload);
         setHosts(Array.isArray(res?.data?.hosts) ? res.data.hosts : []);
       } catch (e) {
         console.error("[PreferenceManager] HOST 목록 조회 실패", e);
@@ -233,7 +233,7 @@ const PreferenceManager = () => {
           table: String(db.table || "summary").trim(),
           hosts: selectedHosts,
         };
-        const res = await apiClient.post("/api/master/nes-by-host", payload);
+        const res = await apiClient.post("/master/nes-by-host", payload);
         setNes(Array.isArray(res?.data?.nes) ? res.data.nes : []);
       } catch (e) {
         console.error("[PreferenceManager] NE 목록 조회 실패", e);
@@ -266,10 +266,7 @@ const PreferenceManager = () => {
           hosts: selectedHosts,
           nes: selectedNEs,
         };
-        const res = await apiClient.post(
-          "/api/master/cells-by-host-ne",
-          payload
-        );
+        const res = await apiClient.post("/master/cells-by-host-ne", payload);
         setCellIds(Array.isArray(res?.data?.cellids) ? res.data.cellids : []);
       } catch (e) {
         console.error("[PreferenceManager] CellID 목록 조회 실패", e);
@@ -694,17 +691,14 @@ const PreferenceManager = () => {
                 try {
                   // Preference의 현재 DB 설정으로 연결 테스트
                   const db = settings?.databaseSettings || {};
-                  const res = await apiClient.post(
-                    "/api/master/test-connection",
-                    {
-                      host: (db.host || "").trim(),
-                      port: Number(db.port) || 5432,
-                      user: (db.user || "").trim(),
-                      password: (db.password || "").trim(),
-                      dbname: (db.dbname || "").trim(),
-                      table: (db.table || "summary").trim(),
-                    }
-                  );
+                  const res = await apiClient.post("/master/test-connection", {
+                    host: (db.host || "").trim(),
+                    port: Number(db.port) || 5432,
+                    user: (db.user || "").trim(),
+                    password: (db.password || "").trim(),
+                    dbname: (db.dbname || "").trim(),
+                    table: (db.table || "summary").trim(),
+                  });
                   const ok = res?.data?.success;
                   if (ok) {
                     alert(

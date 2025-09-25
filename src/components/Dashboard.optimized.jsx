@@ -360,10 +360,7 @@ const Dashboard = () => {
         });
 
         // Time1 데이터 가져오기
-        const time1Response = await apiClient.post(
-          "/api/kpi/query",
-          time1Params
-        );
+        const time1Response = await apiClient.post("/kpi/query", time1Params);
 
         // Time2 API 파라미터
         const time2Params = {
@@ -415,10 +412,7 @@ const Dashboard = () => {
 
         // Time2 데이터 가져오기
         logDashboard("info", "Time2 API 호출 전 파라미터", time2Params);
-        const time2Response = await apiClient.post(
-          "/api/kpi/query",
-          time2Params
-        );
+        const time2Response = await apiClient.post("/kpi/query", time2Params);
         logDashboard("info", "Time2 API 호출 후 응답 상태", {
           status: time2Response?.status,
           statusText: time2Response?.statusText,
@@ -625,10 +619,7 @@ const Dashboard = () => {
 
         logDashboard("debug", "일반 모드 API 파라미터", generalParams);
 
-        const response = await apiClient.post(
-          "/api/kpi/timeseries",
-          generalParams
-        );
+        const response = await apiClient.post("/kpi/timeseries", generalParams);
 
         let dataByKpi = response?.data?.data || {};
 

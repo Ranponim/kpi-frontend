@@ -136,7 +136,7 @@ export const useAnalysisResults = ({
         }
 
         // API 호출 (취소 신호 포함)
-        const response = await apiClient.get("/api/analysis/results", {
+        const response = await apiClient.get("/analysis/results", {
           params,
           signal: abortControllerRef.current.signal,
         });

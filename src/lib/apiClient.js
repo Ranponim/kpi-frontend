@@ -299,7 +299,7 @@ export const startAsyncAnalysis = async (requestParams) => {
 
   try {
     const response = await apiClient.post(
-      "/api/async-analysis/start",
+      "/async-analysis/start",
       requestParams
     );
     logApiClient("info", "비동기 LLM 분석 시작 성공", {
@@ -385,7 +385,7 @@ export const getAsyncAnalysisList = async () => {
   logApiClient("info", "비동기 분석 작업 목록 조회");
 
   try {
-    const response = await apiClient.get("/api/async-analysis/list");
+    const response = await apiClient.get("/async-analysis/list");
     logApiClient("info", "비동기 분석 작업 목록 조회 성공", {
       totalCount: response.data?.total_count,
       runningCount: response.data?.running_count,
@@ -405,7 +405,7 @@ export const getAsyncAnalysisHealth = async () => {
   logApiClient("info", "비동기 분석 서비스 상태 확인");
 
   try {
-    const response = await apiClient.get("/api/async-analysis/health");
+    const response = await apiClient.get("/async-analysis/health");
     logApiClient("info", "비동기 분석 서비스 상태 확인 성공", {
       status: response.data?.status,
       runningTasks: response.data?.running_tasks,
@@ -450,10 +450,7 @@ export const testDatabaseConnection = async (dbConfig) => {
   });
 
   try {
-    const response = await apiClient.post(
-      "/api/master/test-connection",
-      dbConfig
-    );
+    const response = await apiClient.post("/master/test-connection", dbConfig);
     logApiClient("info", "Database 연결 성공");
     return { success: true, data: response.data };
   } catch (error) {
@@ -605,7 +602,7 @@ export const getPEGComparisonStatus = async (resultId) => {
     logApiClient("info", `PEG 비교분석 상태 조회: ${resultId}`);
 
     const response = await apiClient.get(
-      `/api/analysis/results/${resultId}/peg-comparison/status`
+      `/analysis/results/${resultId}/peg-comparison/status`
     );
 
     return response.data;
@@ -699,7 +696,7 @@ export const createUserPreferences = async (preferenceData) => {
 
   try {
     const response = await apiClient.post(
-      "/api/preference/settings",
+      "/preference/settings",
       preferenceData
     );
 
@@ -723,7 +720,7 @@ export const deleteUserPreferences = async (userId = "default") => {
   logApiClient("info", "사용자 설정 삭제", { userId });
 
   try {
-    await apiClient.delete("/api/preference/settings", {
+    await apiClient.delete("/preference/settings", {
       params: { user_id: userId },
     });
 
