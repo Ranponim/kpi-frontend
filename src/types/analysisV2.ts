@@ -132,3 +132,4 @@ export interface AnalysisFilterParamsV2 {
   date_to?: string;
   choi_status?: "normal" | "warning" | "critical";
 }
+
