@@ -418,23 +418,98 @@ export const getAsyncAnalysisHealth = async () => {
 };
 
 /**
- * 분석 결과 목록에서 LLM 분석 결과도 포함하여 조회합니다
+ * 분석 결과 목록에서 LLM 분석 결과도 포함하여 조회합니다 (V1 - 레거시)
  * 기존 getAnalysisResults에 type 필터 추가
  * @param {Object} params - 쿼리 파라미터
  * @returns {Promise<Object>} 분석 결과 목록
  */
 export const getAnalysisResults = async (params = {}) => {
-  logApiClient("info", "분석 결과 목록 조회", { params });
+  logApiClient("info", "분석 결과 목록 조회 (V1)", { params });
 
   try {
     const response = await apiClient.get("/analysis/results", { params });
 
-    logApiClient("info", "분석 결과 목록 조회 성공", {
+    logApiClient("info", "분석 결과 목록 조회 성공 (V1)", {
       resultCount: response.data?.results?.length || 0,
     });
     return response.data;
   } catch (error) {
-    logApiClient("error", "분석 결과 목록 조회 실패", error);
+    logApiClient("error", "분석 결과 목록 조회 실패 (V1)", error);
+    throw error;
+  }
+};
+
+/**
+ * 분석 결과 목록 조회 (V2 - 간소화)
+ * @param {Object} params - 쿼리 파라미터
+ * @param {number} [params.page=1] - 페이지 번호
+ * @param {number} [params.size=20] - 페이지 크기
+ * @param {string} [params.ne_id] - NE ID 필터
+ * @param {string} [params.cell_id] - Cell ID 필터
+ * @param {string} [params.swname] - Software Name 필터
+ * @param {string} [params.rel_ver] - Release Version 필터
+ * @param {string} [params.date_from] - 시작 날짜
+ * @param {string} [params.date_to] - 종료 날짜
+ * @param {string} [params.choi_status] - Choi 판정 상태
+ * @returns {Promise<Object>} 분석 결과 목록 {items, total, page, size, has_next}
+ */
+export const getAnalysisResultsV2 = async (params = {}) => {
+  logApiClient("info", "분석 결과 목록 조회 (V2)", { params });
+
+  try {
+    const response = await apiClient.get("/analysis/results-v2", { params });
+
+    logApiClient("info", "분석 결과 목록 조회 성공 (V2)", {
+      itemCount: response.data?.items?.length || 0,
+      total: response.data?.total || 0,
+      page: response.data?.page || 1,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "분석 결과 목록 조회 실패 (V2)", error);
+    throw error;
+  }
+};
+
+/**
+ * 분석 결과 상세 조회 (V2)
+ * @param {string} resultId - 결과 ID
+ * @returns {Promise<Object>} 분석 결과 상세
+ */
+export const getAnalysisResultDetailV2 = async (resultId) => {
+  logApiClient("info", "분석 결과 상세 조회 (V2)", { resultId });
+
+  try {
+    const response = await apiClient.get(`/analysis/results-v2/${resultId}`);
+
+    logApiClient("info", "분석 결과 상세 조회 성공 (V2)", {
+      ne_id: response.data?.data?.ne_id,
+      cell_id: response.data?.data?.cell_id,
+      swname: response.data?.data?.swname,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "분석 결과 상세 조회 실패 (V2)", error);
+    throw error;
+  }
+};
+
+/**
+ * 분석 결과 통계 요약 (V2)
+ * @returns {Promise<Object>} 통계 요약
+ */
+export const getAnalysisStatsV2 = async () => {
+  logApiClient("info", "분석 결과 통계 요약 조회 (V2)");
+
+  try {
+    const response = await apiClient.get("/analysis/results-v2/stats/summary");
+
+    logApiClient("info", "분석 결과 통계 요약 조회 성공 (V2)", {
+      totalCount: response.data?.data?.total_count || 0,
+    });
+    return response.data;
+  } catch (error) {
+    logApiClient("error", "분석 결과 통계 요약 조회 실패 (V2)", error);
     throw error;
   }
 };
