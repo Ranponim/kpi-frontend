@@ -373,3 +373,8 @@ export default AnalysisResultV2Display;
 // 각 하위 컴포넌트도 export (재사용 가능)
 export { ChoiResultDisplay, LLMAnalysisDisplay, PEGComparisonsDisplay };
 
+
+
+
+
+

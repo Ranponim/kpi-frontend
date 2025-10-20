@@ -4,6 +4,7 @@ import React, { lazy, Suspense } from "react";
 const Dashboard = lazy(() => import("./Dashboard.optimized.jsx"));
 const PreferenceManager = lazy(() => import("./PreferenceManager.jsx"));
 const ResultsList = lazy(() => import("./ResultsList.jsx"));
+const ResultsListV2 = lazy(() => import("./ResultsListV2.jsx"));
 
 // 차트 관련 컴포넌트들 (recharts 사용)
 const ResultDetail = lazy(() => import("./ResultDetail.jsx"));
@@ -12,6 +13,7 @@ const ResultDetail = lazy(() => import("./ResultDetail.jsx"));
 export const preloadDashboard = () => import("./Dashboard.optimized.jsx");
 export const preloadPreferenceManager = () => import("./PreferenceManager.jsx");
 export const preloadResultsList = () => import("./ResultsList.jsx");
+export const preloadResultsListV2 = () => import("./ResultsListV2.jsx");
 
 // 차트 관련 프리로딩
 export const preloadResultDetail = () => import("./ResultDetail.jsx");
@@ -37,6 +39,7 @@ export const preloadBasedOnNetworkSpeed = () => {
       setTimeout(() => {
         preloadPreferenceManager().catch(console.warn);
         preloadResultsList().catch(console.warn);
+        preloadResultsListV2().catch(console.warn);
       }, 2000);
     } else {
       console.log("📶 느린 네트워크 - 필요시에만 로드");
@@ -77,6 +80,12 @@ export const SuspenseResultsList = ({ ...props }) => (
   </Suspense>
 );
 
+export const SuspenseResultsListV2 = ({ ...props }) => (
+  <Suspense fallback={<LoadingSpinner name="분석 결과 V2" />}>
+    <ResultsListV2 {...props} />
+  </Suspense>
+);
+
 export const SuspenseResultDetail = ({ ...props }) => (
   <Suspense fallback={<LoadingSpinner name="결과 상세" />}>
     <ResultDetail {...props} />
@@ -84,4 +93,4 @@ export const SuspenseResultDetail = ({ ...props }) => (
 );
 
 // 기본 컴포넌트들 (하위 호환성)
-export { Dashboard, PreferenceManager, ResultsList };
+export { Dashboard, PreferenceManager, ResultsList, ResultsListV2 };

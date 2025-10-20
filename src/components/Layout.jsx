@@ -1,10 +1,11 @@
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button.jsx";
-import { BarChart3, Settings, Database } from "lucide-react";
+import { BarChart3, Settings, Database, DatabaseZap } from "lucide-react";
 import {
   preloadDashboard,
   preloadPreferenceManager,
   preloadResultsList,
+  preloadResultsListV2,
   preloadBasedOnNetworkSpeed,
 } from "./LazyComponents.jsx";
 
@@ -21,6 +22,12 @@ const Layout = ({ children, activeMenu, setActiveMenu }) => {
       label: "분석 결과",
       icon: Database,
       preload: preloadResultsList,
+    },
+    {
+      id: "resultsV2",
+      label: "분석 결과 V2",
+      icon: DatabaseZap,
+      preload: preloadResultsListV2,
     },
     {
       id: "preference",

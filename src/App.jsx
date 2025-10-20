@@ -25,6 +25,7 @@ const PreferenceManager = lazy(() =>
   import("./components/PreferenceManager.jsx")
 );
 const ResultsList = lazy(() => import("./components/ResultsList.jsx"));
+const ResultsListV2 = lazy(() => import("./components/ResultsListV2.jsx"));
 import { PreferenceProvider } from "./contexts/PreferenceContext.jsx";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import "./App.css";
@@ -72,6 +73,7 @@ const MENU_ITEMS = {
   DASHBOARD: "dashboard",
   PREFERENCE: "preference",
   RESULTS: "results",
+  RESULTS_V2: "resultsV2",
 };
 
 // ================================
@@ -170,6 +172,10 @@ function App() {
         case MENU_ITEMS.RESULTS:
           logApp("debug", "ResultsList 컴포넌트 렌더링");
           return <ResultsList />;
+
+        case MENU_ITEMS.RESULTS_V2:
+          logApp("debug", "ResultsListV2 컴포넌트 렌더링");
+          return <ResultsListV2 />;
 
         default:
           logApp("warn", "알 수 없는 메뉴 선택", { activeMenu });
