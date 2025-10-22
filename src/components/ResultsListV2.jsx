@@ -296,19 +296,32 @@ const ResultsListV2 = () => {
   const handleShowDetail = useCallback(
     (resultId) => {
       try {
+        console.log(
+          "🔍 [handleShowDetail] 호출됨 - resultId:",
+          resultId,
+          "타입:",
+          typeof resultId
+        );
+
         if (!resultId) {
           logInfo("상세 보기할 결과 ID가 없습니다", { resultId });
+          console.error("❌ [handleShowDetail] resultId가 비어있음:", resultId);
           return;
         }
 
         logInfo("V2 상세 보기 요청", { resultId });
+        console.log("✅ [handleShowDetail] 모달 열기 - resultId:", resultId);
+
         setDetailModal({
           isOpen: true,
           resultId: resultId,
           mode: "single",
         });
+
+        console.log("✅ [handleShowDetail] detailModal 상태 업데이트 완료");
       } catch (error) {
         logInfo("상세 보기 핸들러 오류", { error, resultId });
+        console.error("❌ [handleShowDetail] 오류 발생:", error);
       }
     },
     [logInfo]
@@ -710,83 +723,97 @@ const ResultsListV2 = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedResults.map((result) => (
-                    <TableRow
-                      key={result.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleShowDetail(result.id)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedResults.has(result.id)}
-                          onChange={() => handleSelectResult(result.id)}
-                          className="rounded border-gray-300"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {formatDate(result.created_at)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {result.ne_id || "-"}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {result.cell_id || "-"}
-                      </TableCell>
-                      <TableCell>{result.swname || "-"}</TableCell>
-                      <TableCell>{result.rel_ver || "-"}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={getChoiStatusBadgeVariant(
-                            result.choi_result
-                          )}
-                        >
-                          {result.choi_result?.status || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleShowDetail(result.id)}
-                            title="상세 보기"
+                  {sortedResults.map((result) => {
+                    console.log(
+                      "📋 [ResultsListV2] 테이블 행 렌더링 - result.id:",
+                      result.id,
+                      "result:",
+                      result
+                    );
+                    return (
+                      <TableRow
+                        key={result.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          console.log(
+                            "👆 [ResultsListV2] 테이블 행 클릭됨 - result.id:",
+                            result.id
+                          );
+                          handleShowDetail(result.id);
+                        }}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedResults.has(result.id)}
+                            onChange={() => handleSelectResult(result.id)}
+                            className="rounded border-gray-300"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {formatDate(result.created_at)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {result.ne_id || "-"}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {result.cell_id || "-"}
+                        </TableCell>
+                        <TableCell>{result.swname || "-"}</TableCell>
+                        <TableCell>{result.rel_ver || "-"}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={getChoiStatusBadgeVariant(
+                              result.choi_result
+                            )}
                           >
-                            <Search className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="sm" title="삭제">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  분석 결과 삭제
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  이 분석 결과를 삭제하시겠습니까? 이 작업은
-                                  되돌릴 수 없습니다.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>취소</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(result.id)}
-                                >
-                                  삭제
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            {result.choi_result?.status || "N/A"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleShowDetail(result.id)}
+                              title="상세 보기"
+                            >
+                              <Search className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" title="삭제">
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    분석 결과 삭제
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    이 분석 결과를 삭제하시겠습니까? 이 작업은
+                                    되돌릴 수 없습니다.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>취소</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDelete(result.id)}
+                                  >
+                                    삭제
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -820,5 +847,3 @@ const ResultsListV2 = () => {
 };
 
 export default memo(ResultsListV2);
-
-
