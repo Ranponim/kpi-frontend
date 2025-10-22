@@ -292,7 +292,7 @@ const ResultDetailV2 = ({
         className={`${
           isFullscreen
             ? "max-w-full h-screen m-0 rounded-none"
-            : "max-w-[90vw] max-h-[90vh]"
+            : "max-w-[90vw] max-h-[90vh] resize-both overflow-auto"
         } flex flex-col`}
       >
         {/* 헤더 */}

@@ -5,7 +5,10 @@
  * Choi 알고리즘, LLM 분석, PEG 비교 결과를 통합 표시
  */
 
-import React from "react";
+import React, { useState } from "react";
+import { WidthProvider, Responsive } from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 import {
   Card,
   CardContent,
@@ -25,6 +28,8 @@ import {
   Activity,
   Gauge,
 } from "lucide-react";
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 /**
  * Choi 알고리즘 결과 표시
@@ -573,11 +578,57 @@ const AnalysisResultV2Display = ({ result }) => {
     );
   }
 
+  const initialLayouts = {
+    lg: [
+      { i: "info", x: 0, y: 0, w: 12, h: 2, static: true },
+      { i: "choi", x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
+      { i: "llm", x: 4, y: 2, w: 8, h: 14, minW: 5, minH: 8 },
+      { i: "peg", x: 0, y: 3, w: 12, h: 9, minW: 6, minH: 6 },
+    ],
+    md: [
+      { i: "info", x: 0, y: 0, w: 10, h: 2, static: true },
+      { i: "choi", x: 0, y: 2, w: 4, h: 5, minW: 3, minH: 4 },
+      { i: "llm", x: 4, y: 2, w: 6, h: 14, minW: 4, minH: 8 },
+      { i: "peg", x: 0, y: 3, w: 10, h: 8, minW: 5, minH: 6 },
+    ],
+    sm: [
+      { i: "info", x: 0, y: 0, w: 6, h: 2, static: true },
+      { i: "choi", x: 0, y: 2, w: 6, h: 5, minW: 3, minH: 4 },
+      { i: "llm", x: 0, y: 7, w: 6, h: 12, minW: 4, minH: 8 },
+      { i: "peg", x: 0, y: 19, w: 6, h: 9, minW: 4, minH: 6 },
+    ],
+    xs: [
+      { i: "info", x: 0, y: 0, w: 4, h: 3, static: true },
+      { i: "choi", x: 0, y: 3, w: 4, h: 5, minW: 2, minH: 4 },
+      { i: "llm", x: 0, y: 8, w: 4, h: 12, minW: 3, minH: 8 },
+      { i: "peg", x: 0, y: 20, w: 4, h: 10, minW: 3, minH: 6 },
+    ],
+    xxs: [
+      { i: "info", x: 0, y: 0, w: 2, h: 4, static: true },
+      { i: "choi", x: 0, y: 4, w: 2, h: 5, minW: 2, minH: 4 },
+      { i: "llm", x: 0, y: 9, w: 2, h: 12, minW: 2, minH: 8 },
+      { i: "peg", x: 0, y: 21, w: 2, h: 11, minW: 2, minH: 6 },
+    ],
+  };
+
+  const [layouts, setLayouts] = useState(initialLayouts);
+
+  const onLayoutChange = (layout, newLayouts) => {
+    setLayouts(newLayouts);
+  };
+
   return (
-    <div className="w-full">
-      {/* 기본 정보 - 전체 너비 */}
-      <div className="mb-6">
-        <Card>
+    <ResponsiveGridLayout
+      className="layout"
+      layouts={layouts}
+      onLayoutChange={onLayoutChange}
+      breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
+      cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
+      rowHeight={30}
+      measureBeforeMount={true}
+    >
+      <div key="info" className="overflow-auto">
+        <Card className="h-full">
           <CardHeader>
             <CardTitle>분석 기본 정보</CardTitle>
           </CardHeader>
@@ -613,41 +664,16 @@ const AnalysisResultV2Display = ({ result }) => {
           </CardContent>
         </Card>
       </div>
-
-      {/* 
-        분석 결과 블럭들 - 그리드 레이아웃
-        - 모바일: 1열 (grid-cols-1)
-        - 태블릿: 2열 (md:grid-cols-2)
-        - 데스크톱: 3열 (xl:grid-cols-3)
-        - gap-6: 블럭 간 간격
-        - auto-rows-auto: 각 행의 높이는 컨텐츠에 맞춰 자동 조정
-        - items-start: 블럭들을 상단 정렬
-      */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-auto items-start">
-        {/* Choi 알고리즘 판정 */}
-        <div className="w-full">
-          <ChoiResultDisplay choiResult={result.choi_result} />
-        </div>
-
-        {/* LLM 분석 결과 - 더 넓게 (2열 차지) */}
-        <div className="w-full md:col-span-2 xl:col-span-2">
-          <LLMAnalysisDisplay llmAnalysis={result.llm_analysis} />
-        </div>
-
-        {/* PEG 비교 결과 - 전체 너비 (3열 차지) */}
-        <div className="w-full md:col-span-2 xl:col-span-3">
-          <PEGComparisonsDisplay pegComparisons={result.peg_comparisons} />
-        </div>
-
-        {/* 
-          향후 추가 블럭을 위한 공간
-          예시:
-          <div className="w-full">
-            <NewBlockComponent data={result.new_data} />
-          </div>
-        */}
+      <div key="choi" className="overflow-auto">
+        <ChoiResultDisplay choiResult={result.choi_result} />
       </div>
-    </div>
+      <div key="llm" className="overflow-auto">
+        <LLMAnalysisDisplay llmAnalysis={result.llm_analysis} />
+      </div>
+      <div key="peg" className="overflow-auto">
+        <PEGComparisonsDisplay pegComparisons={result.peg_comparisons} />
+      </div>
+    </ResponsiveGridLayout>
   );
 };
 
