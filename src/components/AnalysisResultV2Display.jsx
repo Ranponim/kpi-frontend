@@ -114,6 +114,10 @@ const ChoiResultDisplay = ({ choiResult }) => {
 
 /**
  * LLM 분석 결과 표시
+ *
+ * 개선 사항:
+ * - 문제점과 권장사항을 가로로 배치하여 한 화면에 더 많이 표시
+ * - 반응형 레이아웃 적용
  */
 const LLMAnalysisDisplay = ({ llmAnalysis }) => {
   if (!llmAnalysis) {
@@ -132,7 +136,7 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* 요약 */}
+        {/* 요약 - 전체 너비 */}
         {llmAnalysis.summary && (
           <div>
             <h4 className="font-semibold mb-2">📝 종합 요약</h4>
@@ -142,59 +146,109 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
           </div>
         )}
 
-        <Separator />
+        {/* 문제점과 권장사항을 그리드로 배치 */}
+        {((llmAnalysis.issues && llmAnalysis.issues.length > 0) ||
+          (llmAnalysis.recommendations &&
+            llmAnalysis.recommendations.length > 0)) && (
+          <>
+            <Separator />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* 발견된 문제 */}
+              {llmAnalysis.issues && llmAnalysis.issues.length > 0 && (
+                <div className="border rounded-lg p-4 bg-red-50/50">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    발견된 문제점 ({llmAnalysis.issues.length}개)
+                  </h4>
+                  <ul className="space-y-2">
+                    {llmAnalysis.issues.map((issue, idx) => (
+                      <li key={idx} className="text-sm flex items-start gap-2">
+                        <span className="text-red-500 font-bold mt-0.5 shrink-0">
+                          •
+                        </span>
+                        <span>{issue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-        {/* 발견된 문제 */}
-        {llmAnalysis.issues && llmAnalysis.issues.length > 0 && (
-          <div>
-            <h4 className="font-semibold mb-2 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-500" />
-              발견된 문제점 ({llmAnalysis.issues.length}개)
-            </h4>
-            <ul className="space-y-2">
-              {llmAnalysis.issues.map((issue, idx) => (
-                <li key={idx} className="text-sm flex items-start gap-2">
-                  <span className="text-red-500 font-bold mt-0.5">•</span>
-                  <span>{issue}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+              {/* 권장 조치 */}
+              {llmAnalysis.recommendations &&
+                llmAnalysis.recommendations.length > 0 && (
+                  <div className="border rounded-lg p-4 bg-green-50/50">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      권장 조치 사항 ({llmAnalysis.recommendations.length}개)
+                    </h4>
+                    <ul className="space-y-2">
+                      {llmAnalysis.recommendations.map((rec, idx) => (
+                        <li
+                          key={idx}
+                          className="text-sm flex items-start gap-2"
+                        >
+                          <span className="text-green-500 font-bold mt-0.5 shrink-0">
+                            ✓
+                          </span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+            </div>
+          </>
         )}
 
-        {/* 권장 조치 */}
-        {llmAnalysis.recommendations &&
-          llmAnalysis.recommendations.length > 0 && (
-            <div>
-              <h4 className="font-semibold mb-2 flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                권장 조치 사항 ({llmAnalysis.recommendations.length}개)
-              </h4>
-              <ul className="space-y-2">
-                {llmAnalysis.recommendations.map((rec, idx) => (
-                  <li key={idx} className="text-sm flex items-start gap-2">
-                    <span className="text-green-500 font-bold mt-0.5">✓</span>
-                    <span>{rec}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        {/* PEG 인사이트가 있다면 그리드로 표시 */}
+        {llmAnalysis.peg_insights &&
+          Object.keys(llmAnalysis.peg_insights).length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  PEG 인사이트 ({Object.keys(llmAnalysis.peg_insights).length}
+                  개)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {Object.entries(llmAnalysis.peg_insights).map(
+                    ([pegName, insight], idx) => (
+                      <div
+                        key={idx}
+                        className="border rounded-lg p-3 bg-blue-50/30 hover:bg-blue-50/50 transition-colors"
+                      >
+                        <div className="font-semibold text-sm mb-1 text-blue-700">
+                          {pegName}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {insight}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            </>
           )}
 
         {/* 신뢰도 */}
         {llmAnalysis.confidence !== undefined && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="font-semibold">신뢰도:</span>
-            <div className="flex-1 bg-muted rounded-full h-2">
-              <div
-                className="bg-primary h-2 rounded-full transition-all"
-                style={{ width: `${llmAnalysis.confidence * 100}%` }}
-              />
+          <>
+            <Separator />
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-semibold">신뢰도:</span>
+              <div className="flex-1 bg-muted rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all"
+                  style={{ width: `${llmAnalysis.confidence * 100}%` }}
+                />
+              </div>
+              <span className="text-muted-foreground">
+                {(llmAnalysis.confidence * 100).toFixed(1)}%
+              </span>
             </div>
-            <span className="text-muted-foreground">
-              {(llmAnalysis.confidence * 100).toFixed(1)}%
-            </span>
-          </div>
+          </>
         )}
       </CardContent>
     </Card>
@@ -203,6 +257,11 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
 
 /**
  * PEG 비교 결과 표시
+ *
+ * 개선 사항:
+ * - PEG 항목들을 그리드 레이아웃으로 배치 (가로 2-3열)
+ * - 각 PEG 카드가 독립적으로 배치되어 한 화면에 더 많이 표시
+ * - 반응형: 모바일 1열, 태블릿 2열, 데스크톱 3열
  */
 const PEGComparisonsDisplay = ({ pegComparisons }) => {
   if (!pegComparisons || pegComparisons.length === 0) {
@@ -233,7 +292,13 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
         <CardDescription>N-1 기간과 N 기간의 성능 지표 변화</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
+        {/* 
+          PEG 항목들을 그리드로 배치
+          - 모바일: 1열
+          - 태블릿: 2열
+          - 데스크톱: 3열
+        */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-auto">
           {pegComparisons.map((peg, idx) => {
             const isImproved = peg.change_percentage > 0;
             const isStable = Math.abs(peg.change_percentage) < 1;
@@ -241,10 +306,15 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
             return (
               <div
                 key={idx}
-                className="border rounded-lg p-3 hover:bg-muted/20 transition-colors"
+                className="border rounded-lg p-3 hover:bg-muted/20 transition-colors hover:shadow-md"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <h5 className="font-semibold text-sm">{peg.peg_name}</h5>
+                <div className="flex items-center justify-between mb-3">
+                  <h5
+                    className="font-semibold text-sm truncate"
+                    title={peg.peg_name}
+                  >
+                    {peg.peg_name}
+                  </h5>
                   <Badge
                     variant={
                       isStable
@@ -253,7 +323,7 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
                         ? "success"
                         : "destructive"
                     }
-                    className="flex items-center gap-1"
+                    className="flex items-center gap-1 shrink-0 ml-2"
                   >
                     {!isStable &&
                       (isImproved ? (
@@ -267,33 +337,52 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
                 </div>
 
                 {/* 통계 비교 */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 gap-2 text-xs mb-2">
                   <div className="bg-blue-50 p-2 rounded">
-                    <div className="text-blue-600 font-semibold mb-1">
+                    <div className="text-blue-600 font-semibold mb-1 text-center">
                       N-1 기간
                     </div>
-                    <div>평균: {peg.n_minus_1.avg.toFixed(2)}</div>
-                    <div>95%: {peg.n_minus_1.pct_95.toFixed(2)}</div>
+                    <div className="text-center">
+                      <div className="font-bold text-base">
+                        {peg.n_minus_1.avg.toFixed(2)}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        95%: {peg.n_minus_1.pct_95.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                   <div className="bg-green-50 p-2 rounded">
-                    <div className="text-green-600 font-semibold mb-1">
+                    <div className="text-green-600 font-semibold mb-1 text-center">
                       N 기간
                     </div>
-                    <div>평균: {peg.n.avg.toFixed(2)}</div>
-                    <div>95%: {peg.n.pct_95.toFixed(2)}</div>
+                    <div className="text-center">
+                      <div className="font-bold text-base">
+                        {peg.n.avg.toFixed(2)}
+                      </div>
+                      <div className="text-muted-foreground text-xs">
+                        95%: {peg.n.pct_95.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 {/* 절대 변화량 */}
-                <div className="mt-2 text-xs text-muted-foreground">
-                  절대 변화: {peg.change_absolute.toFixed(2)}
+                <div className="text-xs text-muted-foreground text-center py-2 border-t">
+                  절대 변화:{" "}
+                  <span className="font-semibold">
+                    {peg.change_absolute.toFixed(2)}
+                  </span>
                 </div>
 
                 {/* LLM 인사이트 */}
                 {peg.llm_insight && (
-                  <div className="mt-2 text-xs bg-muted/30 p-2 rounded">
-                    <span className="font-semibold">💡 인사이트:</span>{" "}
-                    {peg.llm_insight}
+                  <div className="mt-2 text-xs bg-muted/30 p-2 rounded border-t">
+                    <div className="flex items-start gap-1">
+                      <span className="shrink-0">💡</span>
+                      <span className="line-clamp-3" title={peg.llm_insight}>
+                        {peg.llm_insight}
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
@@ -307,6 +396,12 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
 
 /**
  * V2 분석 결과 통합 표시 컴포넌트
+ *
+ * 레이아웃 설계:
+ * - 반응형 그리드 레이아웃 (모바일: 1열, 태블릿: 2열, 데스크톱: 3열)
+ * - 각 블럭은 독립적으로 배치되며 자동으로 높이 조정
+ * - 추가 블럭이 들어와도 자동으로 그리드에 배치됨
+ * - 세로 스크롤 자유롭게 가능
  */
 const AnalysisResultV2Display = ({ result }) => {
   if (!result) {
@@ -318,52 +413,79 @@ const AnalysisResultV2Display = ({ result }) => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* 기본 정보 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>분석 기본 정보</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <dt className="text-sm font-semibold text-muted-foreground">
-                NE ID
-              </dt>
-              <dd className="text-sm font-mono">{result.ne_id}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-semibold text-muted-foreground">
-                Cell ID
-              </dt>
-              <dd className="text-sm font-mono">{result.cell_id}</dd>
-            </div>
-            <div>
-              <dt className="text-sm font-semibold text-muted-foreground">
-                Software
-              </dt>
-              <dd className="text-sm font-mono">{result.swname}</dd>
-            </div>
-            {result.rel_ver && (
+    <div className="w-full">
+      {/* 기본 정보 - 전체 너비 */}
+      <div className="mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>분석 기본 정보</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <dt className="text-sm font-semibold text-muted-foreground">
-                  Release
+                  NE ID
                 </dt>
-                <dd className="text-sm font-mono">{result.rel_ver}</dd>
+                <dd className="text-sm font-mono">{result.ne_id}</dd>
               </div>
-            )}
-          </dl>
-        </CardContent>
-      </Card>
+              <div>
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Cell ID
+                </dt>
+                <dd className="text-sm font-mono">{result.cell_id}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-semibold text-muted-foreground">
+                  Software
+                </dt>
+                <dd className="text-sm font-mono">{result.swname}</dd>
+              </div>
+              {result.rel_ver && (
+                <div>
+                  <dt className="text-sm font-semibold text-muted-foreground">
+                    Release
+                  </dt>
+                  <dd className="text-sm font-mono">{result.rel_ver}</dd>
+                </div>
+              )}
+            </dl>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Choi 알고리즘 판정 */}
-      <ChoiResultDisplay choiResult={result.choi_result} />
+      {/* 
+        분석 결과 블럭들 - 그리드 레이아웃
+        - 모바일: 1열 (grid-cols-1)
+        - 태블릿: 2열 (md:grid-cols-2)
+        - 데스크톱: 3열 (xl:grid-cols-3)
+        - gap-6: 블럭 간 간격
+        - auto-rows-auto: 각 행의 높이는 컨텐츠에 맞춰 자동 조정
+        - items-start: 블럭들을 상단 정렬
+      */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 auto-rows-auto items-start">
+        {/* Choi 알고리즘 판정 */}
+        <div className="w-full">
+          <ChoiResultDisplay choiResult={result.choi_result} />
+        </div>
 
-      {/* LLM 분석 결과 */}
-      <LLMAnalysisDisplay llmAnalysis={result.llm_analysis} />
+        {/* LLM 분석 결과 - 더 넓게 (2열 차지) */}
+        <div className="w-full md:col-span-2 xl:col-span-2">
+          <LLMAnalysisDisplay llmAnalysis={result.llm_analysis} />
+        </div>
 
-      {/* PEG 비교 결과 */}
-      <PEGComparisonsDisplay pegComparisons={result.peg_comparisons} />
+        {/* PEG 비교 결과 - 전체 너비 (3열 차지) */}
+        <div className="w-full md:col-span-2 xl:col-span-3">
+          <PEGComparisonsDisplay pegComparisons={result.peg_comparisons} />
+        </div>
+
+        {/* 
+          향후 추가 블럭을 위한 공간
+          예시:
+          <div className="w-full">
+            <NewBlockComponent data={result.new_data} />
+          </div>
+        */}
+      </div>
     </div>
   );
 };
@@ -372,9 +494,3 @@ export default AnalysisResultV2Display;
 
 // 각 하위 컴포넌트도 export (재사용 가능)
 export { ChoiResultDisplay, LLMAnalysisDisplay, PEGComparisonsDisplay };
-
-
-
-
-
-
