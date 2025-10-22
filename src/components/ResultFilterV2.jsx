@@ -49,7 +49,8 @@ const ResultFilterV2 = ({
     if (filters.rel_ver?.trim()) count++;
     if (filters.date_from) count++;
     if (filters.date_to) count++;
-    if (filters.choi_status?.trim()) count++;
+    // "all"은 필터가 아니므로 카운트하지 않음
+    if (filters.choi_status?.trim() && filters.choi_status !== "all") count++;
 
     return count;
   }, [filters]);
@@ -106,8 +107,9 @@ const ResultFilterV2 = ({
   }, [onToggleCollapse, logInfo]);
 
   // === Choi 상태 옵션 ===
+  // 주의: Select.Item은 빈 문자열을 value로 허용하지 않으므로 "all" 사용
   const choiStatusOptions = [
-    { value: "", label: "전체" },
+    { value: "all", label: "전체" },
     { value: "normal", label: "정상" },
     { value: "warning", label: "주의" },
     { value: "critical", label: "위험" },
@@ -233,10 +235,14 @@ const ResultFilterV2 = ({
             <div className="space-y-2">
               <Label htmlFor="filter-choi-status">Choi 판정</Label>
               <Select
-                value={filters.choi_status || ""}
-                onValueChange={(value) =>
-                  handleFilterChange("choi_status", value)
-                }
+                value={filters.choi_status || "all"}
+                onValueChange={(value) => {
+                  // "all"이면 필터를 제거 (빈 문자열로 전달)
+                  handleFilterChange(
+                    "choi_status",
+                    value === "all" ? "" : value
+                  );
+                }}
               >
                 <SelectTrigger id="filter-choi-status" className="h-9">
                   <SelectValue placeholder="전체" />
@@ -268,5 +274,3 @@ const ResultFilterV2 = ({
 };
 
 export default ResultFilterV2;
-
-
