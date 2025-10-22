@@ -22,6 +22,8 @@ import {
   AlertCircle,
   Maximize2,
   Minimize2,
+  Move,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAnalysisResultDetailV2 } from "@/lib/apiClient.js";
@@ -38,6 +40,10 @@ const ResultDetailV2 = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [dialogSize, setDialogSize] = useState({
+    width: "90vw",
+    height: "90vh",
+  });
 
   // === 키보드 단축키 지원 ===
   useEffect(() => {
@@ -253,6 +259,29 @@ const ResultDetailV2 = ({
     fetchData();
   }, [isOpen, resultIds, mode]);
 
+  // === 창 크기 조절 핸들러 ===
+  const handleResize = (direction, amount) => {
+    setDialogSize((prev) => {
+      const newSize = { ...prev };
+
+      if (direction === "width") {
+        const newWidth = Math.max(
+          400,
+          Math.min(window.innerWidth * 0.95, parseInt(prev.width) + amount)
+        );
+        newSize.width = `${newWidth}px`;
+      } else if (direction === "height") {
+        const newHeight = Math.max(
+          300,
+          Math.min(window.innerHeight * 0.95, parseInt(prev.height) + amount)
+        );
+        newSize.height = `${newHeight}px`;
+      }
+
+      return newSize;
+    });
+  };
+
   // === 데이터 내보내기 ===
   const handleExport = () => {
     if (!result) {
@@ -292,14 +321,74 @@ const ResultDetailV2 = ({
         className={`${
           isFullscreen
             ? "max-w-full h-screen m-0 rounded-none"
-            : "max-w-[90vw] max-h-[90vh] resize-both overflow-auto"
+            : "resize-both overflow-auto"
         } flex flex-col`}
+        style={
+          !isFullscreen
+            ? {
+                width: dialogSize.width,
+                height: dialogSize.height,
+                minWidth: "400px",
+                minHeight: "300px",
+                maxWidth: "95vw",
+                maxHeight: "95vh",
+              }
+            : {}
+        }
       >
         {/* 헤더 */}
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>분석 결과 상세 (V2)</DialogTitle>
             <div className="flex items-center gap-2">
+              {/* 창 크기 조절 버튼들 (전체화면이 아닐 때만 표시) */}
+              {!isFullscreen && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleResize("width", 100)}
+                    title="가로 크기 증가"
+                  >
+                    <Move className="h-4 w-4 rotate-90" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleResize("width", -100)}
+                    title="가로 크기 감소"
+                  >
+                    <Move className="h-4 w-4 -rotate-90" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleResize("height", 100)}
+                    title="세로 크기 증가"
+                  >
+                    <Move className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleResize("height", -100)}
+                    title="세로 크기 감소"
+                  >
+                    <Move className="h-4 w-4 rotate-180" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      setDialogSize({ width: "90vw", height: "90vh" })
+                    }
+                    title="기본 크기로 복원"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+
               {/* 전체화면 토글 */}
               <Button
                 variant="ghost"

@@ -32,8 +32,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.jsx";
-import { Settings, BarChart3 } from "lucide-react";
-import apiClient from "@/lib/apiClient.js";
+import { Settings, BarChart3, Brain } from "lucide-react";
+import { toast } from "sonner";
+import apiClient, {
+  startAsyncAnalysis,
+  getAsyncAnalysisStatus,
+  getAsyncAnalysisResult,
+} from "@/lib/apiClient.js";
 import { useDashboardSettings, usePreference } from "@/hooks/usePreference.js";
 import { calculateAllDerivedPegs } from "@/lib/derivedPegUtils.js";
 
@@ -42,6 +47,7 @@ import DashboardHeader from "./DashboardHeader.jsx";
 import DashboardSettings from "./DashboardSettings.jsx";
 import DashboardCard from "./DashboardCard.jsx";
 import DashboardChart from "./DashboardChart.jsx";
+import AnalysisResultV2Display from "./AnalysisResultV2Display.jsx";
 
 // ================================
 // 로깅 유틸리티
@@ -93,6 +99,11 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false); // 초기값을 false로 변경
   const [lastRefresh, setLastRefresh] = useState(null);
   const [zoomed, setZoomed] = useState({ open: false, title: "", data: [] });
+
+  // LLM 분석 상태 관리
+  const [llmAnalysisLoading, setLlmAnalysisLoading] = useState(false);
+  const [llmAnalysisResult, setLlmAnalysisResult] = useState(null);
+  const [llmAnalysisId, setLlmAnalysisId] = useState(null);
 
   // 임시 시간 입력 상태
   const [tempTimeSettings, setTempTimeSettings] = useState({
@@ -690,6 +701,162 @@ const Dashboard = () => {
     fetchKPIData();
   }, [fetchKPIData]);
 
+  // LLM 분석 실행 핸들러
+  const handleLLMAnalysis = useCallback(async () => {
+    logDashboard("info", "LLM 분석 시작", {
+      time1Start,
+      time1End,
+      time2Start,
+      time2End,
+      selectedNEs,
+      selectedCellIds,
+    });
+
+    // 필수 파라미터 검증
+    if (!time1Start || !time1End || !time2Start || !time2End) {
+      toast.error("Time1과 Time2 설정을 모두 완료해주세요.");
+      return;
+    }
+
+    if (selectedNEs.length === 0 || selectedCellIds.length === 0) {
+      toast.error("NE와 Cell ID를 선택해주세요.");
+      return;
+    }
+
+    try {
+      setLlmAnalysisLoading(true);
+      toast.info("LLM 분석을 시작합니다...");
+
+      // 분석 요청 파라미터 구성
+      const analysisParams = {
+        // N-1 기간 (Time1)
+        n_minus_1: {
+          start: time1Start,
+          end: time1End,
+        },
+        // N 기간 (Time2)
+        n: {
+          start: time2Start,
+          end: time2End,
+        },
+        // NE ID (첫 번째 항목 사용)
+        ne_id: selectedNEs[0],
+        // Cell ID (첫 번째 항목 사용)
+        cell_id: selectedCellIds[0].toString(),
+        // DB 설정 (필요한 경우)
+        db_config: {
+          // 백엔드에서 기본값 사용
+        },
+      };
+
+      logDashboard("info", "LLM 분석 요청 파라미터", analysisParams);
+
+      // 비동기 분석 시작
+      const startResponse = await startAsyncAnalysis(analysisParams);
+
+      if (!startResponse || !startResponse.analysis_id) {
+        throw new Error("분석 ID를 받지 못했습니다.");
+      }
+
+      const analysisId = startResponse.analysis_id;
+      setLlmAnalysisId(analysisId);
+
+      logDashboard("info", "LLM 분석 시작 완료", { analysisId });
+      toast.success(`LLM 분석이 시작되었습니다. ID: ${analysisId}`);
+
+      // 분석 상태 폴링 시작
+      const pollInterval = 3000; // 3초마다 상태 확인
+      const maxAttempts = 60; // 최대 3분 (3초 * 60)
+      let attempts = 0;
+
+      const pollStatus = async () => {
+        try {
+          attempts++;
+          logDashboard(
+            "debug",
+            `LLM 분석 상태 조회 (${attempts}/${maxAttempts})`,
+            { analysisId }
+          );
+
+          const statusResponse = await getAsyncAnalysisStatus(analysisId);
+
+          logDashboard("debug", "LLM 분석 상태", {
+            status: statusResponse.status,
+            progress: statusResponse.progress,
+          });
+
+          if (statusResponse.status === "completed") {
+            // 분석 완료 - 결과 조회
+            logDashboard("info", "LLM 분석 완료, 결과 조회 중...");
+            toast.success("LLM 분석이 완료되었습니다. 결과를 불러오는 중...");
+
+            const resultResponse = await getAsyncAnalysisResult(analysisId);
+
+            logDashboard("info", "LLM 분석 결과 조회 완료", {
+              hasResult: !!resultResponse.result,
+            });
+
+            setLlmAnalysisResult(resultResponse.result);
+            setLlmAnalysisLoading(false);
+            toast.success("LLM 분석 결과를 성공적으로 불러왔습니다.");
+
+            // 차트 데이터도 함께 로드
+            fetchKPIData();
+          } else if (statusResponse.status === "failed") {
+            // 분석 실패
+            logDashboard("error", "LLM 분석 실패", {
+              error: statusResponse.error,
+            });
+            setLlmAnalysisLoading(false);
+            toast.error(
+              `LLM 분석 실패: ${statusResponse.error || "알 수 없는 오류"}`
+            );
+          } else if (
+            statusResponse.status === "running" ||
+            statusResponse.status === "pending"
+          ) {
+            // 분석 진행 중
+            if (attempts >= maxAttempts) {
+              logDashboard("warn", "LLM 분석 타임아웃");
+              setLlmAnalysisLoading(false);
+              toast.error(
+                "LLM 분석이 너무 오래 걸립니다. 나중에 다시 시도해주세요."
+              );
+            } else {
+              // 계속 폴링
+              setTimeout(pollStatus, pollInterval);
+            }
+          }
+        } catch (error) {
+          logDashboard("error", "LLM 분석 상태 조회 실패", error);
+
+          if (attempts >= maxAttempts) {
+            setLlmAnalysisLoading(false);
+            toast.error("LLM 분석 상태 조회 실패");
+          } else {
+            // 계속 폴링
+            setTimeout(pollStatus, pollInterval);
+          }
+        }
+      };
+
+      // 폴링 시작
+      setTimeout(pollStatus, pollInterval);
+    } catch (error) {
+      logDashboard("error", "LLM 분석 시작 실패", error);
+      setLlmAnalysisLoading(false);
+      toast.error(`LLM 분석 시작 실패: ${error.message || "알 수 없는 오류"}`);
+    }
+  }, [
+    time1Start,
+    time1End,
+    time2Start,
+    time2End,
+    selectedNEs,
+    selectedCellIds,
+    fetchKPIData,
+  ]);
+
   // 차트 데이터 구성 함수
   const buildChartDataByLayout = useCallback(
     (kpiKey) => {
@@ -1025,6 +1192,8 @@ const Dashboard = () => {
         onToggleTime1Settings={toggleTime1Settings}
         onToggleTime2Settings={toggleTime2Settings}
         onManualRefresh={handleManualRefresh}
+        onLLMAnalysis={handleLLMAnalysis}
+        llmAnalysisLoading={llmAnalysisLoading}
       />
 
       {/* 헤더 컴포넌트 */}
@@ -1049,11 +1218,27 @@ const Dashboard = () => {
             Time1/Time2 비교 활성화
           </Badge>
         )}
+        {llmAnalysisResult && (
+          <Badge variant="default" className="bg-indigo-100 text-indigo-800">
+            LLM 분석 완료 (ID: {llmAnalysisId})
+          </Badge>
+        )}
 
         <Badge variant="outline">차트 스타일: {chartStyle}</Badge>
         {!showLegend && <Badge variant="secondary">범례 숨김</Badge>}
         {!showGrid && <Badge variant="secondary">격자 숨김</Badge>}
       </div>
+
+      {/* LLM 분석 결과 표시 */}
+      {llmAnalysisResult && (
+        <div className="space-y-4">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <Brain className="h-6 w-6 text-indigo-600" />
+            LLM 분석 결과
+          </h3>
+          <AnalysisResultV2Display result={llmAnalysisResult} />
+        </div>
+      )}
 
       {/* KPI 차트들 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
