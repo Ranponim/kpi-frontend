@@ -74,24 +74,52 @@ const ResultDetailV2 = ({
         message: "모든 지표가 정상 범위 내에 있습니다",
       },
 
-      // LLM 분석 결과 (예시)
+      // LLM 분석 결과 (Enhanced 프롬프트 구조)
       llm_analysis: {
-        summary:
-          "전반적으로 네트워크 성능이 안정적입니다. DL Throughput이 소폭 증가했으며, RACH Success Rate가 개선되었습니다. 지속적인 모니터링이 권장됩니다.",
-        issues: [
-          "UL Throughput이 이전 기간 대비 2.3% 감소",
-          "일부 시간대에 RRC Connection 지연 관찰됨",
+        executive_summary:
+          "AirMacDLThruAvg(Kbps)의 급격한 감소와 RandomlySelectedPreamblesLow(count)의 현저한 변동성을 확인했습니다. 이는 다운링크 자원 할당 실패 또는 랜덤 액세스 성능 저하를 시사합니다.",
+        diagnostic_findings: [
+          {
+            primary_hypothesis:
+              "다운링크 자원 할당 실패 또는 접속 시도 실패로 인한 성능 저하",
+            supporting_evidence:
+              "AirMacDLThruAvg(Kbps)의 극심한 감소는 다운링크 데이터 전송에 직접적인 영향을 미치므로, 자원 할당 실패나 RRC connection setup failure 등의 가능성이 높습니다. RandomlySelectedPreamblesLow(count)의 변동성은 셀 접속 시도가 불안정함을 나타냅니다.",
+            confounding_factors_assessment:
+              "동일 환경 가정 하에서, 하드웨어 오류 가능성은 낮다고 판단됩니다. 다만, 네트워크 트래픽 급증이나 외부 간섭 요인이 있었다면 이는 교란 요인으로 작용할 수 있습니다.",
+          },
         ],
-        recommendations: [
-          "UL Throughput 감소 원인 분석 필요",
-          "RRC Connection 최적화 검토",
-          "피크 시간대 리소스 할당 재검토",
+        recommended_actions: [
+          {
+            priority: "P1",
+            action:
+              "다운링크 자원 할당 관련 로그 분석 및 스케줄링 파라미터 확인",
+            details:
+              "2025-09-04_12:30~2025-09-04_13:45 구간과 2025-09-05_12:45~2025-09-05_13:00 구간의 RRC connection setup failure 로그를 비교 분석하여, 자원 할당 실패의 근본 원인을 파악합니다.",
+          },
+          {
+            priority: "P2",
+            action: "RACH 파라미터 최적화 및 프리앰블 설정 재검토",
+            details:
+              "RandomlySelectedPreamblesLow(count)의 변동성이 큰 구간에서 RACH preamble 설정 및 backoff indicator를 재검토하여 접속 안정성을 개선합니다.",
+          },
+        ],
+        // 추가 분석 필드 (심도 있는 분석용)
+        technical_analysis:
+          "DL Throughput 감소는 PRB 할당 실패와 직접 연관되며, 스케줄러의 자원 배분 알고리즘이 피크 트래픽 상황에서 효율적으로 동작하지 못하고 있을 가능성이 있습니다. RACH Preamble 변동성은 contention-based 랜덤 액세스 절차의 불안정성을 나타내며, 백오프 지연이 과도하게 증가하는 것으로 추정됩니다.",
+        cells_with_significant_change: ["cell_2010", "cell_2011", "cell_2015"],
+        action_plan:
+          "1단계: RRC 실패 로그 수집 및 분석 (1-2일)\n2단계: PRB 할당 알고리즘 검토 및 파라미터 조정 (2-3일)\n3단계: RACH preamble 설정 최적화 (1일)\n4단계: 실시간 모니터링 체계 구축 및 성능 재평가 (1주일)",
+        key_findings: [
+          "DL Throughput 85% 급감 (특정 시간대 집중)",
+          "RACH Preamble 변동성 200% 증가",
+          "RRC Connection Setup Failure Rate 상승",
+          "특정 셀(2010, 2011, 2015)에서 집중 발생",
         ],
         confidence: 0.92,
         model_name: "gemini-2.5-pro",
         peg_insights: {
-          DL_THROUGHPUT: "5.2% 개선, 양호한 추세",
-          RACH_SUCCESS_RATE: "98.5%로 목표 달성",
+          DL_THROUGHPUT: "급격한 감소 (-85%), 즉시 조치 필요",
+          RACH_SUCCESS_RATE: "변동성 증가, 모니터링 강화 필요",
         },
       },
 

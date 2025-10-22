@@ -129,73 +129,209 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Brain className="h-5 w-5" />
-          LLM 분석 결과
+          LLM 분석 결과 (Enhanced)
         </CardTitle>
         {llmAnalysis.model_name && (
           <CardDescription>모델: {llmAnalysis.model_name}</CardDescription>
         )}
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* 요약 - 전체 너비 */}
-        {llmAnalysis.summary && (
+        {/* Executive Summary - 전체 너비 */}
+        {llmAnalysis.executive_summary && (
           <div>
-            <h4 className="font-semibold mb-2">📝 종합 요약</h4>
+            <h4 className="font-semibold mb-2">📝 Executive Summary</h4>
             <p className="text-sm whitespace-pre-wrap bg-muted/30 p-3 rounded-lg">
-              {llmAnalysis.summary}
+              {llmAnalysis.executive_summary}
             </p>
           </div>
         )}
 
-        {/* 문제점과 권장사항을 그리드로 배치 */}
-        {((llmAnalysis.issues && llmAnalysis.issues.length > 0) ||
-          (llmAnalysis.recommendations &&
-            llmAnalysis.recommendations.length > 0)) && (
+        {/* Diagnostic Findings */}
+        {llmAnalysis.diagnostic_findings &&
+          llmAnalysis.diagnostic_findings.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500" />
+                  진단 결과 ({llmAnalysis.diagnostic_findings.length}개)
+                </h4>
+                <div className="space-y-3">
+                  {llmAnalysis.diagnostic_findings.map((finding, idx) => (
+                    <div
+                      key={idx}
+                      className="border rounded-lg p-4 bg-red-50/30 hover:bg-red-50/50 transition-colors"
+                    >
+                      <div className="space-y-2">
+                        {/* Primary Hypothesis */}
+                        <div>
+                          <span className="font-semibold text-sm text-red-700">
+                            🔍 주요 가설:
+                          </span>
+                          <p className="text-sm mt-1">
+                            {finding.primary_hypothesis}
+                          </p>
+                        </div>
+
+                        {/* Supporting Evidence */}
+                        <div>
+                          <span className="font-semibold text-sm text-blue-700">
+                            📊 지지 증거:
+                          </span>
+                          <p className="text-sm mt-1 whitespace-pre-wrap">
+                            {finding.supporting_evidence}
+                          </p>
+                        </div>
+
+                        {/* Confounding Factors Assessment */}
+                        <div>
+                          <span className="font-semibold text-sm text-orange-700">
+                            ⚠️ 교란 요인 평가:
+                          </span>
+                          <p className="text-sm mt-1 whitespace-pre-wrap">
+                            {finding.confounding_factors_assessment}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+        {/* Recommended Actions */}
+        {llmAnalysis.recommended_actions &&
+          llmAnalysis.recommended_actions.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  권장 조치 사항 ({llmAnalysis.recommended_actions.length}개)
+                </h4>
+                <div className="space-y-3">
+                  {llmAnalysis.recommended_actions.map((action, idx) => (
+                    <div
+                      key={idx}
+                      className="border rounded-lg p-4 bg-green-50/30 hover:bg-green-50/50 transition-colors"
+                    >
+                      <div className="space-y-2">
+                        {/* Priority & Action */}
+                        <div className="flex items-start gap-2">
+                          <span
+                            className={`
+                            inline-flex items-center justify-center px-2 py-1 
+                            text-xs font-bold rounded shrink-0
+                            ${
+                              action.priority === "P1"
+                                ? "bg-red-100 text-red-700"
+                                : action.priority === "P2"
+                                ? "bg-orange-100 text-orange-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }
+                          `}
+                          >
+                            {action.priority}
+                          </span>
+                          <p className="text-sm font-semibold flex-1">
+                            {action.action}
+                          </p>
+                        </div>
+
+                        {/* Details */}
+                        <div>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                            {action.details}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+        {/* Technical Analysis - 기술적 상세 분석 */}
+        {llmAnalysis.technical_analysis && (
           <>
             <Separator />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* 발견된 문제 */}
-              {llmAnalysis.issues && llmAnalysis.issues.length > 0 && (
-                <div className="border rounded-lg p-4 bg-red-50/50">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    발견된 문제점 ({llmAnalysis.issues.length}개)
-                  </h4>
-                  <ul className="space-y-2">
-                    {llmAnalysis.issues.map((issue, idx) => (
-                      <li key={idx} className="text-sm flex items-start gap-2">
-                        <span className="text-red-500 font-bold mt-0.5 shrink-0">
-                          •
-                        </span>
-                        <span>{issue}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+            <div>
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <Activity className="h-4 w-4 text-purple-500" />
+                기술적 상세 분석
+              </h4>
+              <p className="text-sm whitespace-pre-wrap bg-purple-50/30 p-3 rounded-lg border">
+                {llmAnalysis.technical_analysis}
+              </p>
+            </div>
+          </>
+        )}
 
-              {/* 권장 조치 */}
-              {llmAnalysis.recommendations &&
-                llmAnalysis.recommendations.length > 0 && (
-                  <div className="border rounded-lg p-4 bg-green-50/50">
-                    <h4 className="font-semibold mb-3 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      권장 조치 사항 ({llmAnalysis.recommendations.length}개)
-                    </h4>
-                    <ul className="space-y-2">
-                      {llmAnalysis.recommendations.map((rec, idx) => (
-                        <li
-                          key={idx}
-                          className="text-sm flex items-start gap-2"
-                        >
-                          <span className="text-green-500 font-bold mt-0.5 shrink-0">
-                            ✓
-                          </span>
-                          <span>{rec}</span>
-                        </li>
-                      ))}
-                    </ul>
+        {/* Key Findings - 핵심 발견 사항 */}
+        {llmAnalysis.key_findings && llmAnalysis.key_findings.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <h4 className="font-semibold mb-3 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                핵심 발견 사항 ({llmAnalysis.key_findings.length}개)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {llmAnalysis.key_findings.map((finding, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-2 text-sm p-2 bg-amber-50/30 rounded-lg border"
+                  >
+                    <span className="text-amber-600 font-bold shrink-0">•</span>
+                    <span>{finding}</span>
                   </div>
-                )}
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Cells with Significant Change - 유의미한 변화 셀 */}
+        {llmAnalysis.cells_with_significant_change &&
+          llmAnalysis.cells_with_significant_change.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-indigo-500" />
+                  유의미한 변화 셀 (
+                  {llmAnalysis.cells_with_significant_change.length}개)
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {llmAnalysis.cells_with_significant_change.map(
+                    (cell, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center px-3 py-1 text-sm font-medium rounded-full bg-indigo-100 text-indigo-700"
+                      >
+                        {cell}
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+        {/* Action Plan - 단계별 실행 계획 */}
+        {llmAnalysis.action_plan && (
+          <>
+            <Separator />
+            <div>
+              <h4 className="font-semibold mb-2 flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-teal-500" />
+                단계별 실행 계획
+              </h4>
+              <p className="text-sm whitespace-pre-wrap bg-teal-50/30 p-3 rounded-lg border">
+                {llmAnalysis.action_plan}
+              </p>
             </div>
           </>
         )}
