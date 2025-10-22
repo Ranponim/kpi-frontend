@@ -164,34 +164,40 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
                     >
                       <div className="space-y-2">
                         {/* Primary Hypothesis */}
-                        <div>
-                          <span className="font-semibold text-sm text-red-700">
-                            🔍 주요 가설:
-                          </span>
-                          <p className="text-sm mt-1">
-                            {finding.primary_hypothesis}
-                          </p>
-                        </div>
+                        {finding.primary_hypothesis && (
+                          <div>
+                            <span className="font-semibold text-sm text-red-700">
+                              🔍 주요 가설:
+                            </span>
+                            <p className="text-sm mt-1">
+                              {finding.primary_hypothesis}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Supporting Evidence */}
-                        <div>
-                          <span className="font-semibold text-sm text-blue-700">
-                            📊 지지 증거:
-                          </span>
-                          <p className="text-sm mt-1 whitespace-pre-wrap">
-                            {finding.supporting_evidence}
-                          </p>
-                        </div>
+                        {finding.supporting_evidence && (
+                          <div>
+                            <span className="font-semibold text-sm text-blue-700">
+                              📊 지지 증거:
+                            </span>
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {finding.supporting_evidence}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Confounding Factors Assessment */}
-                        <div>
-                          <span className="font-semibold text-sm text-orange-700">
-                            ⚠️ 교란 요인 평가:
-                          </span>
-                          <p className="text-sm mt-1 whitespace-pre-wrap">
-                            {finding.confounding_factors_assessment}
-                          </p>
-                        </div>
+                        {finding.confounding_factors_assessment && (
+                          <div>
+                            <span className="font-semibold text-sm text-orange-700">
+                              ⚠️ 교란 요인 평가:
+                            </span>
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {finding.confounding_factors_assessment}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -219,32 +225,38 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
                       <div className="space-y-2">
                         {/* Priority & Action */}
                         <div className="flex items-start gap-2">
-                          <span
-                            className={`
-                            inline-flex items-center justify-center px-2 py-1 
-                            text-xs font-bold rounded shrink-0
-                            ${
-                              action.priority === "P1"
-                                ? "bg-red-100 text-red-700"
-                                : action.priority === "P2"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-yellow-100 text-yellow-700"
-                            }
-                          `}
-                          >
-                            {action.priority}
-                          </span>
-                          <p className="text-sm font-semibold flex-1">
-                            {action.action}
-                          </p>
+                          {action.priority && (
+                            <span
+                              className={`
+                              inline-flex items-center justify-center px-2 py-1 
+                              text-xs font-bold rounded shrink-0
+                              ${
+                                action.priority === "P1"
+                                  ? "bg-red-100 text-red-700"
+                                  : action.priority === "P2"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-yellow-100 text-yellow-700"
+                              }
+                            `}
+                            >
+                              {action.priority}
+                            </span>
+                          )}
+                          {action.action && (
+                            <p className="text-sm font-semibold flex-1">
+                              {action.action}
+                            </p>
+                          )}
                         </div>
 
                         {/* Details */}
-                        <div>
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                            {action.details}
-                          </p>
-                        </div>
+                        {action.details && (
+                          <div>
+                            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {action.details}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
