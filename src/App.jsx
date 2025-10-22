@@ -38,27 +38,31 @@ import "./App.css";
  * 로그 레벨별 출력 함수
  * @param {string} level - 로그 레벨 (info, error, warn, debug)
  * @param {string} message - 로그 메시지
- * @param {any} data - 추가 데이터
+ * @param {any} data - 추가 데이터 (옵션)
  */
 const logApp = (level, message, data = null) => {
   const timestamp = new Date().toISOString();
   const prefix = `[App:${timestamp}]`;
 
+  // data가 null이 아닌 경우에만 출력
+  const logArgs =
+    data !== null ? [`${prefix} ${message}`, data] : [`${prefix} ${message}`];
+
   switch (level) {
     case "info":
-      console.log(`${prefix} ${message}`, data);
+      console.log(...logArgs);
       break;
     case "error":
-      console.error(`${prefix} ${message}`, data);
+      console.error(...logArgs);
       break;
     case "warn":
-      console.warn(`${prefix} ${message}`, data);
+      console.warn(...logArgs);
       break;
     case "debug":
-      console.debug(`${prefix} ${message}`, data);
+      console.debug(...logArgs);
       break;
     default:
-      console.log(`${prefix} ${message}`, data);
+      console.log(...logArgs);
   }
 };
 

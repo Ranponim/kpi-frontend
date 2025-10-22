@@ -95,7 +95,7 @@ const ChoiResultDisplay = ({ choiResult }) => {
         >
           <Icon className={`h-12 w-12 ${config.color}`} />
           <div className="flex-1">
-            {choiResult.score !== undefined && (
+            {choiResult.score !== undefined && choiResult.score !== null && (
               <div className="text-2xl font-bold mb-1">
                 점수: {choiResult.score.toFixed(2)}
               </div>
@@ -381,23 +381,24 @@ const LLMAnalysisDisplay = ({ llmAnalysis }) => {
           )}
 
         {/* 신뢰도 */}
-        {llmAnalysis.confidence !== undefined && (
-          <>
-            <Separator />
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-semibold">신뢰도:</span>
-              <div className="flex-1 bg-muted rounded-full h-2">
-                <div
-                  className="bg-primary h-2 rounded-full transition-all"
-                  style={{ width: `${llmAnalysis.confidence * 100}%` }}
-                />
+        {llmAnalysis.confidence !== undefined &&
+          llmAnalysis.confidence !== null && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-semibold">신뢰도:</span>
+                <div className="flex-1 bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${llmAnalysis.confidence * 100}%` }}
+                  />
+                </div>
+                <span className="text-muted-foreground">
+                  {(llmAnalysis.confidence * 100).toFixed(1)}%
+                </span>
               </div>
-              <span className="text-muted-foreground">
-                {(llmAnalysis.confidence * 100).toFixed(1)}%
-              </span>
-            </div>
-          </>
-        )}
+            </>
+          )}
       </CardContent>
     </Card>
   );
@@ -448,8 +449,10 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
         */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-auto">
           {pegComparisons.map((peg, idx) => {
-            const isImproved = peg.change_percentage > 0;
-            const isStable = Math.abs(peg.change_percentage) < 1;
+            // Null 체크 추가
+            const changePercentage = peg.change_percentage ?? 0;
+            const isImproved = changePercentage > 0;
+            const isStable = Math.abs(changePercentage) < 1;
 
             return (
               <div
@@ -479,8 +482,8 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
                       ) : (
                         <TrendingDown className="h-3 w-3" />
                       ))}
-                    {peg.change_percentage > 0 ? "+" : ""}
-                    {peg.change_percentage.toFixed(2)}%
+                    {changePercentage > 0 ? "+" : ""}
+                    {changePercentage.toFixed(2)}%
                   </Badge>
                 </div>
 
@@ -492,10 +495,15 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
                     </div>
                     <div className="text-center">
                       <div className="font-bold text-base">
-                        {peg.n_minus_1.avg.toFixed(2)}
+                        {peg.n_minus_1?.avg != null
+                          ? peg.n_minus_1.avg.toFixed(2)
+                          : "N/A"}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        95%: {peg.n_minus_1.pct_95.toFixed(2)}
+                        95%:{" "}
+                        {peg.n_minus_1?.pct_95 != null
+                          ? peg.n_minus_1.pct_95.toFixed(2)
+                          : "N/A"}
                       </div>
                     </div>
                   </div>
@@ -505,10 +513,13 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
                     </div>
                     <div className="text-center">
                       <div className="font-bold text-base">
-                        {peg.n.avg.toFixed(2)}
+                        {peg.n?.avg != null ? peg.n.avg.toFixed(2) : "N/A"}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        95%: {peg.n.pct_95.toFixed(2)}
+                        95%:{" "}
+                        {peg.n?.pct_95 != null
+                          ? peg.n.pct_95.toFixed(2)
+                          : "N/A"}
                       </div>
                     </div>
                   </div>
@@ -518,7 +529,9 @@ const PEGComparisonsDisplay = ({ pegComparisons }) => {
                 <div className="text-xs text-muted-foreground text-center py-2 border-t">
                   절대 변화:{" "}
                   <span className="font-semibold">
-                    {peg.change_absolute.toFixed(2)}
+                    {peg.change_absolute != null
+                      ? peg.change_absolute.toFixed(2)
+                      : "N/A"}
                   </span>
                 </div>
 
