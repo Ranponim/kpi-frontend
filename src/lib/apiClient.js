@@ -299,7 +299,7 @@ export const startAsyncAnalysis = async (requestParams) => {
 
   try {
     const response = await apiClient.post(
-      "/async-analysis/start",
+      "/api/async-analysis/start",
       requestParams
     );
     logApiClient("info", "비동기 LLM 분석 시작 성공", {

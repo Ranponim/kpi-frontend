@@ -727,6 +727,23 @@ const Dashboard = () => {
       setLlmAnalysisLoading(true);
       toast.info("LLM 분석을 시작합니다...");
 
+      // ✅ 시간 범위 유효성 검증
+      if (!time1Start || !time1End || !time2Start || !time2End) {
+        toast.error("시간 범위를 모두 선택해주세요.");
+        setLlmAnalysisLoading(false);
+        return;
+      }
+
+      // ✅ 시간 순서 검증
+      if (
+        new Date(time1Start) >= new Date(time1End) ||
+        new Date(time2Start) >= new Date(time2End)
+      ) {
+        toast.error("시작 시간은 종료 시간보다 이전이어야 합니다.");
+        setLlmAnalysisLoading(false);
+        return;
+      }
+
       // 분석 요청 파라미터 구성
       const analysisParams = {
         // N-1 기간 (Time1)
@@ -743,9 +760,14 @@ const Dashboard = () => {
         ne_id: selectedNEs[0],
         // Cell ID (첫 번째 항목 사용)
         cell_id: selectedCellIds[0].toString(),
-        // DB 설정 (필요한 경우)
+        // ✅ DB 설정 추가 (환경변수에서 로드)
         db_config: {
-          // 백엔드에서 기본값 사용
+          host: import.meta.env.VITE_DB_HOST || "165.213.69.30",
+          port: parseInt(import.meta.env.VITE_DB_PORT) || 5442,
+          user: import.meta.env.VITE_DB_USER || "postgres",
+          password: import.meta.env.VITE_DB_PASSWORD || "",
+          dbname: import.meta.env.VITE_DB_NAME || "pvt_db",
+          table: "test_pmdata1",
         },
       };
 
@@ -843,9 +865,32 @@ const Dashboard = () => {
       // 폴링 시작
       setTimeout(pollStatus, pollInterval);
     } catch (error) {
-      logDashboard("error", "LLM 분석 시작 실패", error);
       setLlmAnalysisLoading(false);
-      toast.error(`LLM 분석 시작 실패: ${error.message || "알 수 없는 오류"}`);
+
+      // ✅ 상세한 오류 로깅
+      logDashboard("error", "LLM 분석 시작 실패", {
+        error: error.message,
+        stack: error.stack,
+        params: analysisParams,
+        timestamp: new Date().toISOString(),
+      });
+
+      // ✅ 사용자 친화적 오류 메시지
+      let errorMessage = "알 수 없는 오류가 발생했습니다.";
+      if (error.message?.includes("404")) {
+        errorMessage =
+          "백엔드 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인해주세요.";
+      } else if (error.message?.includes("500")) {
+        errorMessage =
+          "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+      } else if (error.message?.includes("timeout")) {
+        errorMessage =
+          "요청 시간이 초과되었습니다. 네트워크 연결을 확인해주세요.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(`LLM 분석 시작 실패: ${errorMessage}`);
     }
   }, [
     time1Start,
