@@ -738,15 +738,20 @@ const Dashboard = () => {
         db_config: { ...requestData.db_config, password: "[HIDDEN]" }
       });
 
-      // 새 V2 API 호출
+      // 새 V2 API 호출 (동기 방식 - MCP 통합)
       const response = await apiClient.post(
-        "/api/analysis/trigger-llm-analysis-v2",
+        "/api/analysis/results-v2/analyze",
         requestData
       );
 
-      toast.success(`LLM 분석이 시작되었습니다!\n분석 ID: ${response.data.analysis_id}`);
+      // 응답 데이터 구조: { message: "...", data: { ...analysis_model... } }
+      const resultData = response.data.data;
+      // id는 alias로 처리될 수 있으므로 확인
+      const analysisId = resultData.id || resultData._id || resultData.analysis_id;
+
+      toast.success(`LLM 분석이 완료되었습니다!\n분석 ID: ${analysisId}`);
       
-      logDashboard("info", "LLM 분석 V2 트리거 성공", response.data);
+      logDashboard("info", "LLM 분석 V2 완료", response.data);
       
     } catch (error) {
       logDashboard("error", "LLM 분석 V2 실패", error);
