@@ -3,8 +3,8 @@
  */
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Layout } from './components/layout/index.js';
-import { Dashboard, AnalysisResults, Preferences } from './pages/index.js';
+import { Layout } from './components/layout';
+import { Dashboard, AnalysisResults, Preferences } from './pages';
 
 function App() {
   return (
@@ -21,3 +21,4 @@ function App() {
 }
 
 export default App;
+
