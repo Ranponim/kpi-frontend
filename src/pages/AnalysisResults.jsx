@@ -158,7 +158,7 @@ export default function AnalysisResults() {
 
   return (
     <div>
-      <Header title="KPI Analysis Results" description="Real-time monitoring and analysis of 3GPP Key Performance Indicators." actions={<><Button variant="secondary" icon="refresh" onClick={refresh}>새로고침</Button><Button icon="add">New Analysis</Button></>} />
+      <Header title="KPI Analysis Results" description="Real-time monitoring and analysis of 3GPP Key Performance Indicators." actions={<Button variant="secondary" icon="refresh" onClick={refresh}>새로고침</Button>} />
       <FilterBar filters={filters} onFilterChange={updateFilters} onClear={clearFilters} isFiltered={isFiltered} />
       {error && <div className="mb-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">{error}</div>}
       <ResultsTable results={results} onRowClick={handleRowClick} loading={loading} />

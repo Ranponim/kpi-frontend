@@ -95,6 +95,27 @@ GET /api/analysis/results-v2/{resultId}
 GET /api/analysis/results-v2/stats/summary
 ```
 
+### 4. LLM 분석 실행
+
+```http
+POST /api/analysis/results-v2/analyze
+```
+
+**Request Body:**
+
+```typescript
+{
+  ne_id: string,           // NE ID
+  cell_id: string,         // Cell ID
+  n_minus_1_start: string, // N-1 시작 시간 (ISO 형식)
+  n_minus_1_end: string,   // N-1 종료 시간 (ISO 형식)
+  n_start: string,         // N 시작 시간 (ISO 형식)
+  n_end: string            // N 종료 시간 (ISO 형식)
+}
+```
+
+**응답:** `AnalysisResultV2` 객체 반환
+
 ---
 
 ## ⏳ 비동기 분석 API
@@ -176,4 +197,6 @@ interface PegComparison {
 ---
 
 **문서 버전:** 1.0.0
+
+
 

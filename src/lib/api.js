@@ -46,6 +46,12 @@ export const getAnalysisStatsV2 = async () => {
   return response.data;
 };
 
+// LLM 분석 실행 API (V2)
+export const runAnalysisV2 = async (params) => {
+  const response = await api.post('/analysis/results-v2/analyze', params);
+  return response.data;
+};
+
 // 비동기 분석 API
 export const startAsyncAnalysis = async (requestParams) => {
   const response = await api.post('/async-analysis/start', requestParams);

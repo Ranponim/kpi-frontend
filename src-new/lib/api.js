@@ -86,3 +86,5 @@ export const saveUserPreferences = async (userId = 'default', settings) => {
 
 export default api;
 
+
+

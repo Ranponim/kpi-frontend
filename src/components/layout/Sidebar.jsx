@@ -57,17 +57,6 @@ export default function Sidebar() {
           ))}
         </nav>
       </div>
-      <div className="mt-auto pt-4 border-t border-slate-200/10">
-        <div className="flex items-center gap-3 px-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2b8cee] to-[#1a5fb4] flex items-center justify-center">
-            <span className="material-symbols-outlined text-white text-xl">person</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-white text-sm font-medium">Network Engineer</span>
-            <span className="text-slate-400 text-xs">engineer@telecom.com</span>
-          </div>
-        </div>
-      </div>
     </aside>
   );
 }
