@@ -3,7 +3,7 @@
  * LLM 분석 API 연동
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Header } from "../components/layout/index.js";
@@ -14,8 +14,9 @@ import {
   DateTimePicker,
   Combobox,
   Badge,
+  Spinner,
 } from "../components/common/index.js";
-import { runAnalysisV2, getUserPreferences } from "../lib/api.js";
+import { runAnalysisV2, getUserPreferences, getEmsNeList } from "../lib/api.js";
 
 function roundDownToFiveMinutes(date) {
   const minutes = date.getMinutes();
@@ -31,28 +32,13 @@ function getCurrentTimeRounded() {
   return format(roundDownToFiveMinutes(new Date()), "yyyy-MM-dd HH:mm");
 }
 
-const NE_ID_OPTIONS = [
-  { value: "SKT_NE_4521_01", label: "SKT_NE_4521_01" },
-  { value: "SKT_NE_4521_02", label: "SKT_NE_4521_02" },
-  { value: "SKT_NE_8873_05", label: "SKT_NE_8873_05" },
-  { value: "nvgnb#10000", label: "nvgnb#10000" },
-  { value: "nvgnb#10001", label: "nvgnb#10001" },
-];
-
-const CELL_ID_OPTIONS = [
-  { value: "C00124", label: "C00124" },
-  { value: "C00125", label: "C00125" },
-  { value: "C00126", label: "C00126" },
-  { value: "2010", label: "2010" },
-  { value: "2011", label: "2011" },
-];
-
-function AnalysisForm({ onSubmit, loading }) {
+function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
   const [formData, setFormData] = useState({
     n1StartTime: "2023-10-26 10:00",
     n1EndTime: "2023-10-26 14:25",
     nStartTime: "2023-10-27 10:00",
     nEndTime: getCurrentTimeRounded(),
+    ems: "",
     neId: "",
     cellId: "",
   });
@@ -64,12 +50,71 @@ function AnalysisForm({ onSubmit, loading }) {
     return () => clearInterval(interval);
   }, []);
 
-  const handleChange = (field) => (value) =>
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  // EMS 옵션 생성
+  const emsOptions = useMemo(() => {
+    if (!emsData) return [];
+    return Object.keys(emsData).map((ems) => ({
+      value: ems,
+      label: ems,
+    }));
+  }, [emsData]);
+
+  // NE ID 옵션 생성 (선택된 EMS 기준)
+  const neIdOptions = useMemo(() => {
+    if (!emsData || !formData.ems) return [];
+    const emsEntry = emsData[formData.ems];
+    if (!emsEntry) return [];
+    return Object.keys(emsEntry).map((neId) => ({
+      value: neId,
+      label: neId,
+    }));
+  }, [emsData, formData.ems]);
+
+  // Cell ID 옵션 생성 (선택된 EMS + NE ID 기준)
+  const cellIdOptions = useMemo(() => {
+    if (!emsData || !formData.ems || !formData.neId) return [];
+    const emsEntry = emsData[formData.ems];
+    if (!emsEntry) return [];
+    const neEntry = emsEntry[formData.neId];
+    if (!neEntry) return [];
+    
+    // 모든 tech의 ID를 합침
+    const allIds = [];
+    Object.entries(neEntry).forEach(([tech, ids]) => {
+      if (Array.isArray(ids)) {
+        ids.forEach((id) => {
+          allIds.push({
+            value: String(id),
+            label: `${id} (${tech})`,
+          });
+        });
+      }
+    });
+    return allIds;
+  }, [emsData, formData.ems, formData.neId]);
+
+  const handleChange = (field) => (value) => {
+    setFormData((prev) => {
+      const newData = { ...prev, [field]: value };
+      // EMS 변경 시 NE ID, Cell ID 초기화
+      if (field === "ems") {
+        newData.neId = "";
+        newData.cellId = "";
+      }
+      // NE ID 변경 시 Cell ID 초기화
+      if (field === "neId") {
+        newData.cellId = "";
+      }
+      return newData;
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(formData);
   };
+
+  const isFormValid = formData.ems && formData.neId && formData.cellId;
 
   return (
     <Card>
@@ -78,6 +123,7 @@ function AnalysisForm({ onSubmit, loading }) {
           분석 조건 설정 (Set Analysis Conditions)
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* 시간 설정 영역 */}
           <div className="rounded-lg border border-slate-200/10 bg-slate-500/5 p-4">
             <p className="text-slate-300 text-sm font-semibold mb-4">
               N-1 기간 (Comparison Period)
@@ -117,29 +163,57 @@ function AnalysisForm({ onSubmit, loading }) {
             </div>
             <p className="text-slate-500 text-xs mt-2 flex items-center gap-1">
               <span className="material-symbols-outlined text-sm">info</span>
-              종료 시간은 현재 시간 기준 5분 단위로 자동 설정됩니다. 필요시 변경
-              가능합니다.
+              종료 시간은 현재 시간 기준 5분 단위로 자동 설정됩니다.
             </p>
           </div>
-          <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Combobox
-              label="NE ID"
-              icon="router"
-              value={formData.neId}
-              onChange={handleChange("neId")}
-              options={NE_ID_OPTIONS}
-              placeholder="NE ID 선택 또는 입력"
-              disabled={loading}
-            />
-            <Combobox
-              label="CELL ID"
-              icon="cell_tower"
-              value={formData.cellId}
-              onChange={handleChange("cellId")}
-              options={CELL_ID_OPTIONS}
-              placeholder="Cell ID 선택 또는 입력"
-              disabled={loading}
-            />
+
+          {/* EMS / NE ID / Cell ID 선택 영역 */}
+          <div className="lg:col-span-2 rounded-lg border border-slate-200/10 bg-slate-500/5 p-4">
+            <p className="text-slate-300 text-sm font-semibold mb-4">
+              네트워크 요소 선택 (Network Element Selection)
+            </p>
+            {emsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Spinner size="md" />
+                <span className="text-slate-400 ml-3">EMS 목록 로딩 중...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Combobox
+                  label="EMS"
+                  icon="dns"
+                  value={formData.ems}
+                  onChange={handleChange("ems")}
+                  options={emsOptions}
+                  placeholder="EMS 선택"
+                  disabled={loading || emsOptions.length === 0}
+                />
+                <Combobox
+                  label="NE ID"
+                  icon="router"
+                  value={formData.neId}
+                  onChange={handleChange("neId")}
+                  options={neIdOptions}
+                  placeholder={formData.ems ? "NE ID 선택" : "EMS를 먼저 선택하세요"}
+                  disabled={loading || !formData.ems || neIdOptions.length === 0}
+                />
+                <Combobox
+                  label="Cell ID"
+                  icon="cell_tower"
+                  value={formData.cellId}
+                  onChange={handleChange("cellId")}
+                  options={cellIdOptions}
+                  placeholder={formData.neId ? "Cell ID 선택" : "NE ID를 먼저 선택하세요"}
+                  disabled={loading || !formData.neId || cellIdOptions.length === 0}
+                />
+              </div>
+            )}
+            {!emsLoading && emsOptions.length === 0 && (
+              <p className="text-yellow-400 text-xs mt-3 flex items-center gap-1">
+                <span className="material-symbols-outlined text-sm">warning</span>
+                EMS 목록을 불러올 수 없습니다. 네트워크 연결을 확인하세요.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex justify-end mt-6 pt-4 border-t border-slate-200/10">
@@ -147,7 +221,7 @@ function AnalysisForm({ onSubmit, loading }) {
             type="submit"
             icon="auto_awesome"
             loading={loading}
-            disabled={loading || !formData.neId || !formData.cellId}
+            disabled={loading || !isFormValid}
           >
             LLM 분석 (LLM Analysis)
           </Button>
@@ -243,6 +317,28 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [dbConfig, setDbConfig] = useState(null);
+  
+  // EMS/NE/Cell 목록 데이터
+  const [emsData, setEmsData] = useState(null);
+  const [emsLoading, setEmsLoading] = useState(true);
+
+  // EMS/NE/Cell 목록 로드
+  useEffect(() => {
+    const loadEmsData = async () => {
+      setEmsLoading(true);
+      try {
+        const data = await getEmsNeList();
+        console.log("[Dashboard] EMS 목록 로드 완료:", data);
+        setEmsData(data);
+      } catch (err) {
+        console.error("[Dashboard] EMS 목록 로드 실패:", err);
+        setEmsData(null);
+      } finally {
+        setEmsLoading(false);
+      }
+    };
+    loadEmsData();
+  }, []);
 
   // 사용자 설정에서 DB 설정 로드
   useEffect(() => {
@@ -265,12 +361,9 @@ export default function Dashboard() {
 
   /**
    * 시간 형식 변환: "YYYY-MM-DD HH:MM" → "YYYY-MM-DD_HH:MM"
-   * @param {string} dateTimeStr - 입력 시간 문자열
-   * @returns {string} 변환된 시간 문자열
    */
   const formatTimeForApi = (dateTimeStr) => {
     if (!dateTimeStr) return "";
-    // 공백이나 T를 언더스코어로 변환
     return dateTimeStr.replace(/[\sT]/g, "_").substring(0, 16);
   };
 
@@ -280,16 +373,10 @@ export default function Dashboard() {
     setAnalysisResult(null);
 
     try {
-      // 백엔드 API 기대 형식에 맞게 요청 파라미터 변환
-      // n_minus_1: "YYYY-MM-DD_HH:MM~YYYY-MM-DD_HH:MM"
-      // n: "YYYY-MM-DD_HH:MM~YYYY-MM-DD_HH:MM"
       const requestParams = {
-        n_minus_1: `${formatTimeForApi(
-          formData.n1StartTime
-        )}~${formatTimeForApi(formData.n1EndTime)}`,
-        n: `${formatTimeForApi(formData.nStartTime)}~${formatTimeForApi(
-          formData.nEndTime
-        )}`,
+        n_minus_1: `${formatTimeForApi(formData.n1StartTime)}~${formatTimeForApi(formData.n1EndTime)}`,
+        n: `${formatTimeForApi(formData.nStartTime)}~${formatTimeForApi(formData.nEndTime)}`,
+        ems: formData.ems,
         ne_id: formData.neId,
         cell_id: formData.cellId,
         db_config: dbConfig
@@ -312,11 +399,9 @@ export default function Dashboard() {
           : undefined,
       });
 
-      // /api/analysis/results-v2/analyze API 호출
       const response = await runAnalysisV2(requestParams);
       console.log("[Dashboard] 분석 결과:", response);
 
-      // 응답 데이터 처리
       const result = response.data || response;
       setAnalysisResult(result);
     } catch (err) {
@@ -349,7 +434,12 @@ export default function Dashboard() {
         description="Set the conditions below to begin your analysis."
       />
 
-      <AnalysisForm onSubmit={handleAnalysisSubmit} loading={loading} />
+      <AnalysisForm 
+        onSubmit={handleAnalysisSubmit} 
+        loading={loading}
+        emsData={emsData}
+        emsLoading={emsLoading}
+      />
 
       {error && (
         <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">

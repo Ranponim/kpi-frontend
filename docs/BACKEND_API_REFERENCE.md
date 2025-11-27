@@ -196,6 +196,41 @@ interface PegComparison {
 
 ---
 
+## 🌐 EMS/NE/Cell 목록 API
+
+### EMS/NE/Cell 목록 조회
+
+```http
+GET http://10.246.183.251:8888/test/list
+```
+
+**응답 구조:**
+
+```typescript
+{
+  [ems_host: string]: {
+    [ne_name: string]: {
+      [tech: string]: number[]  // Cell IDs
+    }
+  }
+}
+```
+
+**응답 예시:**
+
+```json
+{
+  "100.105.239.150": {
+    "UADPF_5000": {
+      "lte": [1, 2, 3, 12, 14, 18, 22, 24, 28, 32, 34, 38],
+      "nr": [4951, 4952, 4967, 4968, 4983, 4984]
+    }
+  }
+}
+```
+
+---
+
 **문서 버전:** 1.0.0
 
 

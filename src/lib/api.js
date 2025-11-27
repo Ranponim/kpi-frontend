@@ -90,5 +90,13 @@ export const saveUserPreferences = async (userId = 'default', settings) => {
   return { success: true, data: response.data };
 };
 
+// EMS/NE/Cell 목록 조회 API
+export const getEmsNeList = async () => {
+  const response = await axios.get('http://10.246.183.251:8888/test/list', {
+    timeout: 10000,
+  });
+  return response.data;
+};
+
 export default api;
 
