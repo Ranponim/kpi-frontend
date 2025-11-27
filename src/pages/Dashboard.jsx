@@ -28,20 +28,33 @@ function roundDownToFiveMinutes(date) {
   return result;
 }
 
+function getTimeOffset(minutesOffset) {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - minutesOffset);
+  return format(roundDownToFiveMinutes(now), "yyyy-MM-dd HH:mm");
+}
+
 function getCurrentTimeRounded() {
   return format(roundDownToFiveMinutes(new Date()), "yyyy-MM-dd HH:mm");
 }
 
+// 기본 시간 설정
+function getDefaultTimes() {
+  return {
+    n1StartTime: getTimeOffset(60),  // 현재 - 1시간
+    n1EndTime: getTimeOffset(45),    // 현재 - 45분
+    nStartTime: getTimeOffset(30),   // 현재 - 30분
+    nEndTime: getCurrentTimeRounded(), // 현재 (5분 단위 내림)
+  };
+}
+
 function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
-  const [formData, setFormData] = useState({
-    n1StartTime: "2023-10-26 10:00",
-    n1EndTime: "2023-10-26 14:25",
-    nStartTime: "2023-10-27 10:00",
-    nEndTime: getCurrentTimeRounded(),
+  const [formData, setFormData] = useState(() => ({
+    ...getDefaultTimes(),
     ems: "",
     neId: "",
     cellId: "",
-  });
+  }));
 
   useEffect(() => {
     const interval = setInterval(() => {
