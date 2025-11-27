@@ -90,9 +90,27 @@ export const saveUserPreferences = async (userId = 'default', settings) => {
   return { success: true, data: response.data };
 };
 
-// EMS/NE/Cell 목록 조회 API (Vite 프록시를 통해 CORS 우회)
+// EMS/NE/Cell 목록 조회 API
+// 개발환경: Vite 프록시 사용 (/ems-api)
+// Docker 환경: runtime config에서 URL 가져옴
+const getEmsApiUrl = () => {
+  // Docker 환경 (runtime config)
+  if (typeof window !== 'undefined' && window.__RUNTIME_CONFIG__?.EMS_API_URL) {
+    return window.__RUNTIME_CONFIG__.EMS_API_URL;
+  }
+  // Vite 환경변수
+  if (import.meta.env.VITE_EMS_API_URL) {
+    return import.meta.env.VITE_EMS_API_URL;
+  }
+  // 개발환경 기본값 (Vite 프록시)
+  return '/ems-api';
+};
+
 export const getEmsNeList = async () => {
-  const response = await axios.get('/ems-api/test/list', {
+  const emsApiUrl = getEmsApiUrl();
+  console.log('[API] EMS API URL:', emsApiUrl);
+  
+  const response = await axios.get(`${emsApiUrl}/test/list`, {
     timeout: 10000,
   });
   return response.data;
