@@ -42,6 +42,12 @@ export default defineConfig({
           });
         },
       },
+      // EMS/NE/Cell 목록 API 프록시 (CORS 우회)
+      "/ems-api": {
+        target: "http://10.246.183.251:8888",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ems-api/, ""),
+      },
     },
   },
 
