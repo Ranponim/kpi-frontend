@@ -16,6 +16,7 @@ export default function Combobox({
   allowCustom = true,
   disabled = false,
   className,
+  multiple = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -26,31 +27,56 @@ export default function Combobox({
     const handleClickOutside = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
         setIsOpen(false);
-        if (search && allowCustom) onChange(search);
+        if (search && allowCustom && !multiple) onChange(search);
         setSearch('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [search, allowCustom, onChange]);
+  }, [search, allowCustom, onChange, multiple]);
   
   const filteredOptions = options.filter((option) => {
     const optionLabel = typeof option === 'string' ? option : option.label;
     const optionValue = typeof option === 'string' ? option : option.value;
     const searchLower = search.toLowerCase();
+    
+    // 이미 선택된 항목 제외 (다중 선택일 경우)
+    if (multiple && Array.isArray(value) && value.includes(optionValue)) {
+      return false;
+    }
+
     return optionLabel.toLowerCase().includes(searchLower) || optionValue.toLowerCase().includes(searchLower);
   });
   
   const handleSelect = (option) => {
     const optionValue = typeof option === 'string' ? option : option.value;
-    onChange(optionValue);
-    setSearch('');
-    setIsOpen(false);
+    
+    if (multiple) {
+      const newValue = Array.isArray(value) ? [...value, optionValue] : [optionValue];
+      onChange(newValue);
+      // 다중 선택 시에는 검색어만 초기화하고 드롭다운은 유지하거나 닫을 수 있음.
+      // 여기서는 계속 선택하기 편하게 검색어만 초기화하고 포커스 유지
+      setSearch('');
+      inputRef.current?.focus();
+    } else {
+      onChange(optionValue);
+      setSearch('');
+      setIsOpen(false);
+    }
+  };
+
+  const handleRemove = (itemToRemove) => {
+    if (multiple && Array.isArray(value)) {
+      const newValue = value.filter(item => item !== itemToRemove);
+      onChange(newValue);
+    }
   };
   
   const handleFocus = () => {
     setIsOpen(true);
-    setSearch(value || '');
+    if (!multiple) {
+      setSearch(value || '');
+    }
   };
   
   const handleInputChange = (e) => {
@@ -62,15 +88,51 @@ export default function Combobox({
     if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredOptions.length > 0) handleSelect(filteredOptions[0]);
-      else if (allowCustom && search) { onChange(search); setSearch(''); setIsOpen(false); }
+      else if (allowCustom && search) { 
+        if (multiple) {
+            const newValue = Array.isArray(value) ? [...value, search] : [search];
+            onChange(newValue);
+            setSearch('');
+        } else {
+            onChange(search); 
+            setSearch(''); 
+            setIsOpen(false); 
+        }
+      }
     } else if (e.key === 'Escape') { setIsOpen(false); setSearch(''); }
+    else if (e.key === 'Backspace' && !search && multiple && Array.isArray(value) && value.length > 0) {
+        // 검색어가 없을 때 백스페이스 누르면 마지막 태그 삭제
+        handleRemove(value[value.length - 1]);
+    }
   };
   
-  const displayValue = isOpen ? search : value || '';
+  const displayValue = isOpen ? search : (multiple ? search : value || '');
   
   return (
     <div className={cn('flex flex-col', className)} ref={containerRef}>
       {label && <label className="text-white text-sm font-medium mb-2">{label}</label>}
+      
+      {/* Selected Tags (Multi-select only) */}
+      {multiple && Array.isArray(value) && value.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {value.map((item, index) => (
+            <span 
+              key={index} 
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-[#2b8cee]/20 text-[#2b8cee] border border-[#2b8cee]/30"
+            >
+              {item}
+              <button 
+                type="button" 
+                onClick={() => handleRemove(item)}
+                className="hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="relative">
         {icon && <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">{icon}</span>}
         <input
@@ -80,7 +142,7 @@ export default function Combobox({
           onChange={handleInputChange}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={multiple && value?.length > 0 ? '' : placeholder}
           disabled={disabled}
           className={cn(
             'w-full h-12 rounded-lg bg-[#192633] border border-[#324d67]',
@@ -106,7 +168,10 @@ export default function Combobox({
               filteredOptions.map((option, index) => {
                 const optionValue = typeof option === 'string' ? option : option.value;
                 const optionLabel = typeof option === 'string' ? option : option.label;
-                const isSelected = optionValue === value;
+                const isSelected = multiple 
+                    ? (Array.isArray(value) && value.includes(optionValue))
+                    : optionValue === value;
+                    
                 return (
                   <button
                     key={index}

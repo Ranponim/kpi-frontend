@@ -41,9 +41,9 @@ function getCurrentTimeRounded() {
 // 기본 시간 설정
 function getDefaultTimes() {
   return {
-    n1StartTime: getTimeOffset(60),  // 현재 - 1시간
-    n1EndTime: getTimeOffset(45),    // 현재 - 45분
-    nStartTime: getTimeOffset(30),   // 현재 - 30분
+    n1StartTime: getTimeOffset(60), // 현재 - 1시간
+    n1EndTime: getTimeOffset(45), // 현재 - 45분
+    nStartTime: getTimeOffset(30), // 현재 - 30분
     nEndTime: getCurrentTimeRounded(), // 현재 (5분 단위 내림)
   };
 }
@@ -51,9 +51,9 @@ function getDefaultTimes() {
 function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
   const [formData, setFormData] = useState(() => ({
     ...getDefaultTimes(),
-    ems: "",
-    neId: "",
-    cellId: "",
+    ems: [],
+    neId: [],
+    cellId: [],
   }));
 
   useEffect(() => {
@@ -74,10 +74,17 @@ function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
 
   // NE ID 옵션 생성 (선택된 EMS 기준)
   const neIdOptions = useMemo(() => {
-    if (!emsData || !formData.ems) return [];
-    const emsEntry = emsData[formData.ems];
-    if (!emsEntry) return [];
-    return Object.keys(emsEntry).map((neId) => ({
+    if (!emsData || !formData.ems || formData.ems.length === 0) return [];
+
+    const allNeIds = new Set();
+    formData.ems.forEach((ems) => {
+      const emsEntry = emsData[ems];
+      if (emsEntry) {
+        Object.keys(emsEntry).forEach((neId) => allNeIds.add(neId));
+      }
+    });
+
+    return Array.from(allNeIds).map((neId) => ({
       value: neId,
       label: neId,
     }));
@@ -85,38 +92,66 @@ function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
 
   // Cell ID 옵션 생성 (선택된 EMS + NE ID 기준)
   const cellIdOptions = useMemo(() => {
-    if (!emsData || !formData.ems || !formData.neId) return [];
-    const emsEntry = emsData[formData.ems];
-    if (!emsEntry) return [];
-    const neEntry = emsEntry[formData.neId];
-    if (!neEntry) return [];
-    
-    // 모든 tech의 ID를 합침
-    const allIds = [];
-    Object.entries(neEntry).forEach(([tech, ids]) => {
-      if (Array.isArray(ids)) {
-        ids.forEach((id) => {
-          allIds.push({
-            value: String(id),
-            label: `${id} (${tech})`,
+    if (
+      !emsData ||
+      !formData.ems ||
+      formData.ems.length === 0 ||
+      !formData.neId ||
+      formData.neId.length === 0
+    )
+      return [];
+
+    const allCellIds = [];
+
+    formData.ems.forEach((ems) => {
+      const emsEntry = emsData[ems];
+      if (!emsEntry) return;
+
+      formData.neId.forEach((neId) => {
+        const neEntry = emsEntry[neId];
+        if (neEntry) {
+          Object.entries(neEntry).forEach(([tech, ids]) => {
+            if (Array.isArray(ids)) {
+              ids.forEach((id) => {
+                allCellIds.push({
+                  value: String(id),
+                  label: `${id} (${tech})`,
+                  tech: tech, // Optional: useful for sorting or coloring
+                });
+              });
+            }
           });
-        });
+        }
+      });
+    });
+
+    // 중복 제거 (같은 Cell ID가 여러 NE/Tech에 있을 수 있음 - 여기서는 값 기준)
+    const uniqueIds = new Map();
+    allCellIds.forEach((item) => {
+      // 키를 "ID-Tech" 조합으로 할지 그냥 ID로 할지 고민.
+      // API가 ID만 받는다면 ID로 중복제거.
+      // 하지만 사용자가 구분하려면 라벨에 정보가 있어야 함.
+      // 일단 ID 기준으로 중복 제거
+      if (!uniqueIds.has(item.value)) {
+        uniqueIds.set(item.value, item);
       }
     });
-    return allIds;
+
+    return Array.from(uniqueIds.values());
   }, [emsData, formData.ems, formData.neId]);
 
   const handleChange = (field) => (value) => {
     setFormData((prev) => {
       const newData = { ...prev, [field]: value };
-      // EMS 변경 시 NE ID, Cell ID 초기화
-      if (field === "ems") {
-        newData.neId = "";
-        newData.cellId = "";
+
+      // 상위 선택이 해제되어 하위 선택이 유효하지 않게 되는 경우 처리는 복잡하므로
+      // 일단 상위가 완전히 비워지면 하위도 비우는 식으로 처리
+      if (field === "ems" && (!value || value.length === 0)) {
+        newData.neId = [];
+        newData.cellId = [];
       }
-      // NE ID 변경 시 Cell ID 초기화
-      if (field === "neId") {
-        newData.cellId = "";
+      if (field === "neId" && (!value || value.length === 0)) {
+        newData.cellId = [];
       }
       return newData;
     });
@@ -127,7 +162,10 @@ function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
     onSubmit(formData);
   };
 
-  const isFormValid = formData.ems && formData.neId && formData.cellId;
+  const isFormValid =
+    formData.ems.length > 0 &&
+    formData.neId.length > 0 &&
+    formData.cellId.length > 0;
 
   return (
     <Card>
@@ -200,6 +238,7 @@ function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
                   options={emsOptions}
                   placeholder="EMS 선택"
                   disabled={loading || emsOptions.length === 0}
+                  multiple={true}
                 />
                 <Combobox
                   label="NE ID"
@@ -207,8 +246,17 @@ function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
                   value={formData.neId}
                   onChange={handleChange("neId")}
                   options={neIdOptions}
-                  placeholder={formData.ems ? "NE ID 선택" : "EMS를 먼저 선택하세요"}
-                  disabled={loading || !formData.ems || neIdOptions.length === 0}
+                  placeholder={
+                    formData.ems.length > 0
+                      ? "NE ID 선택"
+                      : "EMS를 먼저 선택하세요"
+                  }
+                  disabled={
+                    loading ||
+                    formData.ems.length === 0 ||
+                    neIdOptions.length === 0
+                  }
+                  multiple={true}
                 />
                 <Combobox
                   label="Cell ID"
@@ -216,14 +264,25 @@ function AnalysisForm({ onSubmit, loading, emsData, emsLoading }) {
                   value={formData.cellId}
                   onChange={handleChange("cellId")}
                   options={cellIdOptions}
-                  placeholder={formData.neId ? "Cell ID 선택" : "NE ID를 먼저 선택하세요"}
-                  disabled={loading || !formData.neId || cellIdOptions.length === 0}
+                  placeholder={
+                    formData.neId.length > 0
+                      ? "Cell ID 선택"
+                      : "NE ID를 먼저 선택하세요"
+                  }
+                  disabled={
+                    loading ||
+                    formData.neId.length === 0 ||
+                    cellIdOptions.length === 0
+                  }
+                  multiple={true}
                 />
               </div>
             )}
             {!emsLoading && emsOptions.length === 0 && (
               <p className="text-yellow-400 text-xs mt-3 flex items-center gap-1">
-                <span className="material-symbols-outlined text-sm">warning</span>
+                <span className="material-symbols-outlined text-sm">
+                  warning
+                </span>
                 EMS 목록을 불러올 수 없습니다. 네트워크 연결을 확인하세요.
               </p>
             )}
@@ -330,7 +389,7 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [dbConfig, setDbConfig] = useState(null);
-  
+
   // EMS/NE/Cell 목록 데이터
   const [emsData, setEmsData] = useState(null);
   const [emsLoading, setEmsLoading] = useState(true);
@@ -387,11 +446,21 @@ export default function Dashboard() {
 
     try {
       const requestParams = {
-        n_minus_1: `${formatTimeForApi(formData.n1StartTime)}~${formatTimeForApi(formData.n1EndTime)}`,
-        n: `${formatTimeForApi(formData.nStartTime)}~${formatTimeForApi(formData.nEndTime)}`,
-        ems: formData.ems,
-        ne_id: formData.neId,
-        cell_id: formData.cellId,
+        n_minus_1: `${formatTimeForApi(
+          formData.n1StartTime
+        )}~${formatTimeForApi(formData.n1EndTime)}`,
+        n: `${formatTimeForApi(formData.nStartTime)}~${formatTimeForApi(
+          formData.nEndTime
+        )}`,
+        ems: Array.isArray(formData.ems)
+          ? formData.ems.join(",")
+          : formData.ems,
+        ne_id: Array.isArray(formData.neId)
+          ? formData.neId.join(",")
+          : formData.neId,
+        cell_id: Array.isArray(formData.cellId)
+          ? formData.cellId.join(",")
+          : formData.cellId,
         db_config: dbConfig
           ? {
               host: dbConfig.host,
@@ -447,8 +516,8 @@ export default function Dashboard() {
         description="Set the conditions below to begin your analysis."
       />
 
-      <AnalysisForm 
-        onSubmit={handleAnalysisSubmit} 
+      <AnalysisForm
+        onSubmit={handleAnalysisSubmit}
         loading={loading}
         emsData={emsData}
         emsLoading={emsLoading}
